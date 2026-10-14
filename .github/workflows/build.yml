@@ -30,6 +30,9 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Clean Build Cache
+        run: flutter clean
+
       - name: Build APK
         run: flutter build apk --release
 
