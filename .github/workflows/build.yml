@@ -27,11 +27,11 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Clean Build
-        run: flutter clean
-
       - name: Install Dependencies
         run: flutter pub get
+
+      - name: Recreate Android Platform Files
+        run: flutter create . --platforms=android
 
       - name: Build APK
         run: flutter build apk --release
