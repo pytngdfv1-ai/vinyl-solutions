@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const VinylApp());
@@ -14,8 +17,8 @@ class VinylApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primarySwatch: Colors.deepPurple,
         scaffoldBackgroundColor: const Color(0xFF0F0F0F),
+        primarySwatch: Colors.amber,
       ),
       home: const ShelfScreen(),
     );
@@ -23,11 +26,11 @@ class VinylApp extends StatelessWidget {
 }
 
 class Album {
-  final String title;
-  final String artist;
-  final String year;
-  final Color spineColor;
-  final List<String> tracks;
+  String title;
+  String artist;
+  String year;
+  Color spineColor;
+  List<String> tracks;
 
   Album({
     required this.title,
@@ -36,6 +39,22 @@ class Album {
     required this.spineColor,
     required this.tracks,
   });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'artist': artist,
+        'year': year,
+        'spineColor': spineColor.value,
+        'tracks': tracks,
+      };
+
+  factory Album.fromJson(Map<String, dynamic> json) => Album(
+        title: json['title'],
+        artist: json['artist'],
+        year: json['year'],
+        spineColor: Color(json['spineColor']),
+        tracks: List<String>.from(json['tracks']),
+      );
 }
 
 class ShelfScreen extends StatefulWidget {
@@ -46,142 +65,111 @@ class ShelfScreen extends StatefulWidget {
 }
 
 class _ShelfScreenState extends State<ShelfScreen> {
-  final List<Album> albums = [
-    Album(title: 'The Doors', artist: 'The Doors', year: '1967', spineColor: Colors.red.shade900, tracks: ['Break On Through', 'Light My Fire']),
-    Album(title: 'Back in Black', artist: 'AC/DC', year: '1980', spineColor: Colors.grey.shade900, tracks: ['Hells Bells', 'Back in Black']),
-    Album(title: 'Hunky Dory', artist: 'David Bowie', year: '1971', spineColor: Colors.amber.shade800, tracks: ['Changes', 'Life on Mars?']),
-    Album(title: 'Pyromania', artist: 'Def Leppard', year: '1983', spineColor: Colors.blue.shade900, tracks: ['Rock! Rock!', 'Photograph']),
-  ];
-
+  List<Album> library = [];
   Album? selectedAlbum;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLibrary();
+  }
+
+  Future<void> _loadLibrary() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? data = prefs.getString('vinyl_library');
+    if (data != null) {
+      final List decoded = jsonDecode(data);
+      setState(() {
+        library = decoded.map((item) => Album.fromJson(item)).toList();
+      });
+    }
+  }
+
+  Future<void> _saveLibrary() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encoded = jsonEncode(library.map((e) => e.toJson()).toList());
+    await prefs.setString('vinyl_library', encoded);
+  }
+
+  void _addSampleAlbum() {
+    setState(() {
+      library.add(Album(
+        title: 'Back in Black',
+        artist: 'AC/DC',
+        year: '1980',
+        spineColor: Colors.grey.shade900,
+        tracks: ['Hells Bells', 'Back in Black', 'Shoot to Thrill'],
+      ));
+    });
+    _saveLibrary();
+  }
+
+  void _exportBackup() {
+    // Aquí puedes implementar la exportación del JSON a un archivo descargable
+    final String jsonString = jsonEncode(library.map((e) => e.toJson()).toList());
+    debugScaffold(jsonString);
+  }
+
+  void debugScaffold(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Respaldo generado en memoria')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Classic Rock Shelf'),
+        title: const Text('Vinyl Shelf (Vacía al iniciar)'),
         backgroundColor: Colors.transparent,
-        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {
-              // Menú flotante (Colección, Catálogo, Tocadiscos)
-            },
-          )
-        ],
-      ),
-      body: Stack(
-        children: [
-          // Vista de Estantería 3D Estilo Lomo
-          ListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: albums.length,
-            itemBuilder: (context, index) {
-              final album = albums[index];
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    selectedAlbum = album;
-                  });
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 6.0),
-                  height: 45,
-                  decoration: BoxDecoration(
-                    color: album.spineColor,
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black54, offset: Offset(0, 4), blurRadius: 4),
-                    ],
-                  ),
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        album.artist.toUpperCase(),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      Text(
-                        album.title,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            icon: const Icon(Icons.backup),
+            onPressed: _exportBackup,
+            tooltip: 'Respaldar Biblioteca',
           ),
-
-          // Detalle del Álbum Desplegado (Simulando la vista 3D frontal del disco)
-          if (selectedAlbum != null)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black87,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Tapa del disco simulada
-                    Container(
-                      width: 280,
-                      height: 280,
-                      decoration: BoxDecoration(
-                        color: selectedAlbum!.spineColor,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black, blurRadius: 20, spreadRadius: 5)
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          selectedAlbum!.title,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(selectedAlbum!.artist, style: const TextStyle(fontSize: 18, color: Colors.amberAccent)),
-                    Text(selectedAlbum!.year, style: const TextStyle(color: Colors.grey)),
-                    const SizedBox(height: 20),
-                    // Lista de Canciones / Tracks
-                    SizedBox(
-                      height: 120,
-                      child: ListView.builder(
-                        itemCount: selectedAlbum!.tracks.length,
-                        itemBuilder: (ctx, i) => ListTile(
-                          dense: true,
-                          title: Text(selectedAlbum!.tracks[i]),
-                          trailing: const Icon(Icons.play_arrow, color: Colors.amberAccent),
-                          onPressed: () {},
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-                      onPressed: () {
-                        setState(() {
-                          selectedAlbum = null;
-                        });
-                      },
-                      icon: const Icon(Icons.close),
-                      label: const Text('Cerrar Carátula'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _addSampleAlbum,
+            tooltip: 'Añadir Disco de Prueba',
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Buscador flotante (Fase 3)
-        },
-        backgroundColor: Colors.amberAccent,
-        child: const Icon(Icons.search, color: Colors.black),
-      ),
+      body: library.isEmpty
+          ? const Center(
+              child: Text(
+                'Biblioteca vacía. Agrega discos con el buscador o botón (+).',
+                style: TextStyle(color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: library.length,
+              itemBuilder: (context, index) {
+                final album = library[index];
+                return GestureDetector(
+                  onTap: () => setState(() => selectedAlbum = album),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 4.0),
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: album.spineColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(album.artist, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        Text(album.title, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
