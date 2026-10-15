@@ -7,12 +7,12 @@ pluginManagement {
         if (flutterSdkPath == null) { flutterSdkPath = System.getenv('FLUTTER_ROOT') }
         return flutterSdkPath
     }()
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
     repositories {
         google()
         mavenCentral()
-        maven {
-            url "$flutterSdkPath/packages/flutter_tools/gradle"
-        }
+        gradlePluginPortal()
     }
 }
 
