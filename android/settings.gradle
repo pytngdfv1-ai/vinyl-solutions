@@ -26,4 +26,3 @@ plugins {
 }
 
 include ":app"
-```[cite: 1]
