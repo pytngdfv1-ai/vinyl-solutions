@@ -30,9 +30,6 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Regenerate Platform Files
-        run: flutter create . --platforms=android --project-name=vinyl_solutions
-
       - name: Build APK
         run: flutter build apk --release
 
