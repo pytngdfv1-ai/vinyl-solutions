@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace "vinyl.solutions"
-    compileSdk flutter.compileSdkVersion
+    compileSdk 34
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -15,15 +15,19 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = '17'
+        jvmTarget = "17"
+    }
+
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
     }
 
     defaultConfig {
         applicationId "vinyl.solutions"
-        minSdk 21
-        targetSdk flutter.targetSdkVersion
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode flutter.versionCode
+        versionName flutter.versionName
     }
 
     buildTypes {
@@ -34,5 +38,5 @@ android {
 }
 
 flutter {
-    source '../..'
+    source "../.."
 }
