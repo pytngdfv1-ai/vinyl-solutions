@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/crate_view.dart';
+import 'koofr_screen.dart';
 import 'stage_screen.dart';
 
 enum _Filter { all, owned }
@@ -28,6 +29,13 @@ class _CrateScreenState extends State<CrateScreen> {
         transitionsBuilder: (_, a, __, child) =>
             FadeTransition(opacity: a, child: child),
       ),
+    );
+  }
+
+  void _openKoofr() {
+    setState(() => _menuOpen = false);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => KoofrScreen(store: widget.store)),
     );
   }
 
@@ -85,6 +93,14 @@ class _CrateScreenState extends State<CrateScreen> {
                       Navigator.of(context).pop();
                     },
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.cloud_outlined),
+                    title: const Text('Conectar Koofr'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _openKoofr();
+                    },
+                  ),
                 ],
               ),
             ),
@@ -132,6 +148,8 @@ class _CrateScreenState extends State<CrateScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (_menuOpen) ...[
+                        _Pill(label: 'Conectar Koofr', icon: Icons.cloud_outlined, onTap: _openKoofr),
+                        const SizedBox(height: 8),
                         _Pill(label: 'Agregar disco', icon: Icons.add, onTap: _add),
                         const SizedBox(height: 8),
                         _Pill(

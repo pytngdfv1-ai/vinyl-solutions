@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/koofr_settings.dart';
 import '../models/vinyl.dart';
 
 Color hueColor(double hue, double s, double l) =>
@@ -14,6 +15,24 @@ class CoverArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final art = _generated();
+    final url = vinyl.coverUrl;
+    if (url == null) return art;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Image.network(
+        url,
+        headers: KoofrSettings.activeHeaders,
+        fit: BoxFit.cover,
+        cacheWidth: 700,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => art,
+        loadingBuilder: (_, child, p) => p == null ? child : art,
+      ),
+    );
+  }
+
+  Widget _generated() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: CustomPaint(
@@ -53,7 +72,7 @@ class CoverArt extends StatelessWidget {
                   ),
                   SizedBox(height: w * 0.01),
                   Text(
-                    '${vinyl.year}',
+                    vinyl.yearLabel,
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: (w * 0.04).clamp(8.0, 16.0),

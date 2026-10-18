@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/koofr_settings.dart';
 import 'data/vinyl_store.dart';
 import 'screens/crate_screen.dart';
 
@@ -7,6 +8,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final store = VinylStore();
   await store.load();
+  final koofr = await KoofrSettings.load();
+  if (koofr != null) KoofrSettings.activeHeaders = koofr.headers;
   runApp(VinylApp(store: store));
 }
 

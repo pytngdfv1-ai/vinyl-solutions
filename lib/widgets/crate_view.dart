@@ -133,7 +133,7 @@ class _CrateViewState extends State<CrateView>
                         ),
                       ),
                       Text(
-                        '${current.artist} · ${current.year}   ${front + 1}/$n',
+                        '${current.artist}${current.year > 0 ? ' · ${current.year}' : ''}   ${front + 1}/$n',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Colors.white70, fontSize: 12),
