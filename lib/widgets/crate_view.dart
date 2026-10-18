@@ -9,10 +9,16 @@ import 'cover_art.dart';
 /// Caja de discos en perspectiva: arrastra vertical para hojear,
 /// toca el disco del frente para sacarlo.
 class CrateView extends StatefulWidget {
-  const CrateView({super.key, required this.items, required this.onPick});
+  const CrateView({
+    super.key,
+    required this.items,
+    required this.onPick,
+    this.onLongPress,
+  });
 
   final List<Vinyl> items;
   final ValueChanged<Vinyl> onPick;
+  final ValueChanged<Vinyl>? onLongPress;
 
   @override
   State<CrateView> createState() => _CrateViewState();
@@ -97,6 +103,7 @@ class _CrateViewState extends State<CrateView>
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => widget.onPick(current),
+          onLongPress: widget.onLongPress == null ? null : () => widget.onLongPress!(current),
           onVerticalDragStart: (_) => _ctl.stop(),
           onVerticalDragUpdate: (d) => _setPos(_pos + d.delta.dy / 70),
           onVerticalDragEnd: (d) {
