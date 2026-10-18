@@ -64,7 +64,8 @@ class _KoofrScreenState extends State<KoofrScreen> {
       _status = 'Conectando…';
     });
     try {
-      final albums = await KoofrClient(s).scan(
+      final client = KoofrClient(s);
+      final albums = await client.scan(
         onProgress: (name) {
           if (mounted) setState(() => _status = 'Leyendo $name…');
         },
@@ -76,7 +77,7 @@ class _KoofrScreenState extends State<KoofrScreen> {
         _connected = true;
         _password.clear();
         _status = albums.isEmpty
-            ? 'Conectado, pero no encontré FLAC en "${s.folder}".'
+            ? 'Conectado, pero no encontré audio. ${client.diagnostic}'
             : '${albums.length} álbumes agregados a tu biblioteca.';
       });
     } on KoofrException catch (e) {
