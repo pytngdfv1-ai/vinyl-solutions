@@ -106,11 +106,16 @@ class _CrateScreenState extends State<CrateScreen> {
             ),
           ),
           body: Stack(
+            fit: StackFit.expand,
             children: [
               Positioned.fill(
                 child: CrateView(key: ValueKey(_filter), items: items, onPick: _open),
               ),
-              SafeArea(
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: Row(
@@ -138,6 +143,7 @@ class _CrateScreenState extends State<CrateScreen> {
                     ],
                   ),
                 ),
+              ),
               ),
               Positioned(
                 right: 16,
