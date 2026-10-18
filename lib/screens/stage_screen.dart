@@ -369,19 +369,22 @@ class DetailSheet extends StatelessWidget {
                     Expanded(
                       child: FilledButton.icon(
                         icon: Icon(v.owned ? Icons.check : Icons.add),
-                        label: Text(v.owned ? 'En colección' : 'Agregar a colección'),
+                        label: Text(v.owned ? 'En colección' : 'Agregar'),
                         onPressed: () => store.toggleOwned(v.id),
                       ),
                     ),
                     const SizedBox(width: 10),
-                    IconButton.outlined(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () {
-                        store.remove(v.id);
-                        Navigator.of(context)
-                          ..pop()
-                          ..pop();
-                      },
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Eliminar'),
+                        onPressed: () {
+                          store.remove(v.id);
+                          Navigator.of(context)
+                            ..pop()
+                            ..pop();
+                        },
+                      ),
                     ),
                   ],
                 ),

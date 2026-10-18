@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
 import '../models/vinyl.dart';
+import 'cover_lookup.dart';
 import 'koofr_settings.dart';
 
 class KoofrException implements Exception {
@@ -144,7 +145,7 @@ class KoofrClient {
         hue: (key.codeUnits.fold<int>(0, (s, c) => s + c) % 360).toDouble(),
         tracks: [for (final t in audio) _title(t.name)],
         trackUrls: [for (final t in audio) t.uri.toString()],
-        coverUrl: art?.uri.toString(),
+        coverUrl: art?.uri.toString() ?? await CoverLookup.find(artist, album),
         owned: true,
       ));
     }

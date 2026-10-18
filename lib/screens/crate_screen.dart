@@ -32,6 +32,27 @@ class _CrateScreenState extends State<CrateScreen> {
     );
   }
 
+  Future<void> _confirmDelete(Vinyl v) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar disco'),
+        content: Text('¿Quitar "${v.title}" de la biblioteca? Tus archivos en Koofr no se tocan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await widget.store.remove(v.id);
+  }
+
   Future<void> _confirmClear() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -140,7 +161,12 @@ class _CrateScreenState extends State<CrateScreen> {
             fit: StackFit.expand,
             children: [
               Positioned.fill(
-                child: CrateView(key: ValueKey(_filter), items: items, onPick: _open),
+                child: CrateView(
+                  key: ValueKey(_filter),
+                  items: items,
+                  onPick: _open,
+                  onLongPress: _confirmDelete,
+                ),
               ),
               Positioned(
                 top: 0,

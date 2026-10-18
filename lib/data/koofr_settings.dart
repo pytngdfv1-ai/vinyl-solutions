@@ -19,6 +19,10 @@ class KoofrSettings {
   /// Cabeceras activas para audio e imágenes (se llena al iniciar la app).
   static Map<String, String> activeHeaders = {};
 
+  /// Solo se envían credenciales a servidores de Koofr (nunca a terceros).
+  static bool isKoofrUrl(String url) =>
+      (Uri.tryParse(url)?.host ?? '').endsWith('koofr.net');
+
   static const _storage = FlutterSecureStorage();
 
   Map<String, String> get headers => {

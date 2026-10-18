@@ -22,7 +22,7 @@ class CoverArt extends StatelessWidget {
       borderRadius: BorderRadius.circular(radius),
       child: Image.network(
         url,
-        headers: KoofrSettings.activeHeaders,
+        headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
         fit: BoxFit.cover,
         cacheWidth: 700,
         gaplessPlayback: true,
