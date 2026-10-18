@@ -17,17 +17,15 @@ class VinylStore extends ChangeNotifier {
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
     final raw = _prefs!.getString(_key);
-    if (raw == null) {
-      _items = _seed();
-      await _save();
-    } else {
+    if (raw != null) {
       try {
         _items = (jsonDecode(raw) as List)
             .map((e) => Vinyl.fromJson(e as Map<String, dynamic>))
+            // Elimina los discos de demostración de versiones anteriores.
+            .where((v) => !v.id.startsWith('seed_'))
             .toList();
       } catch (_) {
-        _items = _seed();
-        await _save();
+        _items = [];
       }
     }
     notifyListeners();
@@ -69,13 +67,17 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Borra toda la biblioteca guardada en la app.
+  Future<void> clearAll() async {
+    _items = [];
+    notifyListeners();
+    await _save();
+  }
+
   /// Reemplaza los discos de Koofr por el resultado del último escaneo.
-  /// Si hay discos reales, se ocultan los de demostración.
   Future<void> replaceRemote(List<Vinyl> scanned) async {
     final owned = {for (final v in _items) v.id: v.owned};
-    final local = _items
-        .where((v) => !v.hasAudio && !(scanned.isNotEmpty && v.id.startsWith('seed_')))
-        .toList();
+    final local = _items.where((v) => !v.hasAudio).toList();
     final remote = [
       for (final v in scanned) v.copyWith(owned: owned[v.id] ?? true),
     ];
@@ -86,7 +88,6 @@ class VinylStore extends ChangeNotifier {
 
   Future<void> clearRemote() async {
     _items = _items.where((v) => !v.hasAudio).toList();
-    if (_items.isEmpty) _items = _seed();
     notifyListeners();
     await _save();
   }
@@ -96,42 +97,5 @@ class VinylStore extends ChangeNotifier {
       _key,
       jsonEncode(_items.map((e) => e.toJson()).toList()),
     );
-  }
-
-  static List<Vinyl> _seed() {
-    const data = [
-      ['Luna Roja', 'Neón en la Lluvia', 1978],
-      ['The Static Hearts', 'Midnight Radio', 1983],
-      ['Dúo Cobalto', 'Mareas', 1971],
-      ['Velvet Engine', 'Carretera 66', 1975],
-      ['Aurora Sur', 'Canto de Sal', 1989],
-      ['Los Faroles', 'Noches de Vinilo', 1969],
-      ['Paper Satellites', 'Orbit Lines', 1994],
-      ['Mariana Ojeda', 'Casa Abierta', 1981],
-      ['Brass & Bones', 'Late Shift', 1973],
-      ['Cielo Eléctrico', 'Voltaje', 1986],
-      ['Opal Garden', 'Slow Bloom', 1992],
-      ['Tango Cósmico', 'Bandoneón 2000', 1999],
-      ['Grey Harbor', 'Foghorn', 1977],
-      ['Rosa Marea', 'Sur', 1984],
-      ['Night Courier', 'Last Train', 1980],
-      ['Ámbar', 'Tiempo Lento', 1972],
-    ];
-    const pool = [
-      'Intro', 'Luces de Ciudad', 'Marea Alta', 'Sin Prisa', 'Domingo',
-      'Cinta Rota', 'Autopista', 'Eco', 'Medianoche', 'Último Tren',
-    ];
-    return [
-      for (var i = 0; i < data.length; i++)
-        Vinyl(
-          id: 'seed_$i',
-          artist: data[i][0] as String,
-          title: data[i][1] as String,
-          year: data[i][2] as int,
-          hue: (i * 23.0) % 360,
-          tracks: [for (var k = 0; k < 8; k++) pool[(i + k * 3) % pool.length]],
-          owned: i % 3 == 0,
-        ),
-    ];
   }
 }

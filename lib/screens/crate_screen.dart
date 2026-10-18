@@ -32,6 +32,29 @@ class _CrateScreenState extends State<CrateScreen> {
     );
   }
 
+  Future<void> _confirmClear() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Borrar biblioteca'),
+        content: const Text(
+          'Se borrarán todos los discos de la app. Tus archivos en Koofr no se tocan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Borrar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await widget.store.clearAll();
+  }
+
   void _openKoofr() {
     setState(() => _menuOpen = false);
     Navigator.of(context).push(
@@ -91,6 +114,14 @@ class _CrateScreenState extends State<CrateScreen> {
                     onTap: () {
                       setState(() => _filter = _Filter.owned);
                       Navigator.of(context).pop();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_sweep_outlined),
+                    title: const Text('Borrar biblioteca'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _confirmClear();
                     },
                   ),
                   ListTile(

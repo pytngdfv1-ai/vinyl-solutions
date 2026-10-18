@@ -66,7 +66,11 @@ class _CrateViewState extends State<CrateView>
     final items = widget.items;
     if (items.isEmpty) {
       return const Center(
-        child: Text('No hay discos aquí todavía', style: TextStyle(color: Colors.white70)),
+        child: Text(
+          'Biblioteca vacía\nToca + y elige "Conectar Koofr"',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70),
+        ),
       );
     }
     final n = items.length;
