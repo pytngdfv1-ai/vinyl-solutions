@@ -1,0 +1,244 @@
+import 'package:flutter/material.dart';
+
+import '../data/vinyl_store.dart';
+import '../models/vinyl.dart';
+import '../widgets/crate_view.dart';
+import 'stage_screen.dart';
+
+enum _Filter { all, owned }
+
+class CrateScreen extends StatefulWidget {
+  const CrateScreen({super.key, required this.store});
+
+  final VinylStore store;
+
+  @override
+  State<CrateScreen> createState() => _CrateScreenState();
+}
+
+class _CrateScreenState extends State<CrateScreen> {
+  _Filter _filter = _Filter.all;
+  bool _menuOpen = false;
+
+  void _open(Vinyl v) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 450),
+        pageBuilder: (_, __, ___) => StageScreen(store: widget.store, vinyl: v),
+        transitionsBuilder: (_, a, __, child) =>
+            FadeTransition(opacity: a, child: child),
+      ),
+    );
+  }
+
+  Future<void> _add() async {
+    setState(() => _menuOpen = false);
+    final r = await showDialog<(String, String, int)>(
+      context: context,
+      builder: (_) => const _AddDialog(),
+    );
+    if (r != null) {
+      await widget.store.add(artist: r.$1, title: r.$2, year: r.$3);
+      if (mounted) setState(() => _filter = _Filter.all);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.store,
+      builder: (context, _) {
+        final all = widget.store.items;
+        final items =
+            _filter == _Filter.owned ? all.where((e) => e.owned).toList() : all;
+
+        return Scaffold(
+          backgroundColor: Colors.black,
+          drawer: Drawer(
+            backgroundColor: const Color(0xFF161816),
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'VinylSolutions',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.album),
+                    title: const Text('Catálogo completo'),
+                    trailing: _filter == _Filter.all ? const Icon(Icons.check) : null,
+                    onTap: () {
+                      setState(() => _filter = _Filter.all);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.collections_bookmark),
+                    title: const Text('Mi colección'),
+                    trailing: _filter == _Filter.owned ? const Icon(Icons.check) : null,
+                    onTap: () {
+                      setState(() => _filter = _Filter.owned);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: CrateView(key: ValueKey(_filter), items: items, onPick: _open),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    children: [
+                      Builder(
+                        builder: (ctx) => IconButton(
+                          icon: const Icon(Icons.menu),
+                          onPressed: () => Scaffold.of(ctx).openDrawer(),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _filter == _Filter.owned ? 'Mi colección' : 'Catálogo',
+                          style: const TextStyle(
+                            color: Color(0xFF5CFF7A),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (_menuOpen) ...[
+                        _Pill(label: 'Agregar disco', icon: Icons.add, onTap: _add),
+                        const SizedBox(height: 8),
+                        _Pill(
+                          label: _filter == _Filter.all ? 'Ver mi colección' : 'Ver catálogo',
+                          icon: Icons.filter_list,
+                          onTap: () => setState(() {
+                            _filter = _filter == _Filter.all ? _Filter.owned : _Filter.all;
+                            _menuOpen = false;
+                          }),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      FloatingActionButton.small(
+                        onPressed: () => setState(() => _menuOpen = !_menuOpen),
+                        child: AnimatedRotation(
+                          turns: _menuOpen ? 0.125 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          child: const Icon(Icons.add),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.icon, required this.onTap});
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xCC1E1E1E),
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [Text(label), const SizedBox(width: 10), Icon(icon, size: 18)],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddDialog extends StatefulWidget {
+  const _AddDialog();
+
+  @override
+  State<_AddDialog> createState() => _AddDialogState();
+}
+
+class _AddDialogState extends State<_AddDialog> {
+  final _artist = TextEditingController();
+  final _title = TextEditingController();
+  final _year = TextEditingController();
+
+  @override
+  void dispose() {
+    _artist.dispose();
+    _title.dispose();
+    _year.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Agregar disco'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(controller: _artist, decoration: const InputDecoration(labelText: 'Artista')),
+          TextField(controller: _title, decoration: const InputDecoration(labelText: 'Título')),
+          TextField(
+            controller: _year,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Año'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () {
+            final a = _artist.text.trim();
+            final t = _title.text.trim();
+            if (a.isEmpty || t.isEmpty) return;
+            Navigator.of(context).pop((a, t, int.tryParse(_year.text.trim()) ?? DateTime.now().year));
+          },
+          child: const Text('Guardar'),
+        ),
+      ],
+    );
+  }
+}
