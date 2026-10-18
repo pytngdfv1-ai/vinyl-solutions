@@ -7,6 +7,8 @@ class Vinyl {
     required this.hue,
     required this.tracks,
     this.owned = false,
+    this.trackUrls = const [],
+    this.coverUrl,
   });
 
   final String id;
@@ -17,6 +19,13 @@ class Vinyl {
   final List<String> tracks;
   final bool owned;
 
+  /// URLs de streaming (una por pista). Vacío = disco sin audio.
+  final List<String> trackUrls;
+  final String? coverUrl;
+
+  bool get hasAudio => trackUrls.isNotEmpty;
+  String get yearLabel => year > 0 ? '$year' : '';
+
   Vinyl copyWith({bool? owned}) => Vinyl(
         id: id,
         title: title,
@@ -25,6 +34,8 @@ class Vinyl {
         hue: hue,
         tracks: tracks,
         owned: owned ?? this.owned,
+        trackUrls: trackUrls,
+        coverUrl: coverUrl,
       );
 
   Map<String, dynamic> toJson() => {
@@ -35,6 +46,8 @@ class Vinyl {
         'hue': hue,
         'tracks': tracks,
         'owned': owned,
+        'trackUrls': trackUrls,
+        'coverUrl': coverUrl,
       };
 
   factory Vinyl.fromJson(Map<String, dynamic> j) => Vinyl(
@@ -45,5 +58,7 @@ class Vinyl {
         hue: (j['hue'] as num).toDouble(),
         tracks: (j['tracks'] as List).cast<String>(),
         owned: j['owned'] as bool? ?? false,
+        trackUrls: (j['trackUrls'] as List?)?.cast<String>() ?? const [],
+        coverUrl: j['coverUrl'] as String?,
       );
 }

@@ -2,13 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../audio/player_service.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
 
 /// Disco sacado de la caja: tornamesa arriba, carátula abajo.
-/// Toca la carátula para darla vuelta, toca la tornamesa para play/pausa.
+/// Toca la carátula para darla vuelta (pistas), la tornamesa para play/pausa.
 class StageScreen extends StatefulWidget {
   const StageScreen({super.key, required this.store, required this.vinyl});
 
@@ -20,20 +21,57 @@ class StageScreen extends StatefulWidget {
 }
 
 class _StageScreenState extends State<StageScreen> {
-  bool _playing = false;
+  final _audio = PlayerService.instance;
   bool _flipped = false;
+  bool _simPlaying = false; // discos sin audio: solo animación
+  String? _error;
+
+  Vinyl get v => widget.vinyl;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 650), () {
-      if (mounted) setState(() => _playing = true);
-    });
+    _start();
+  }
+
+  Future<void> _start() async {
+    await Future.delayed(const Duration(milliseconds: 650));
+    if (!mounted) return;
+    if (!v.hasAudio) {
+      setState(() => _simPlaying = true);
+      return;
+    }
+    try {
+      await _audio.load(v);
+      _audio.player.play();
+    } catch (e) {
+      if (mounted) setState(() => _error = 'No se pudo reproducir: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    if (v.hasAudio) _audio.stop();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (!v.hasAudio) {
+      setState(() => _simPlaying = !_simPlaying);
+      return;
+    }
+    final p = _audio.player;
+    p.playing ? p.pause() : p.play();
+  }
+
+  Future<void> _playTrack(int i) async {
+    if (!v.hasAudio) return;
+    await _audio.player.seek(Duration.zero, index: i);
+    _audio.player.play();
   }
 
   @override
   Widget build(BuildContext context) {
-    final v = widget.vinyl;
     return Scaffold(
       backgroundColor: const Color(0xFF0E0F0E),
       body: SafeArea(
@@ -63,8 +101,14 @@ class _StageScreenState extends State<StageScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
-                onTap: () => setState(() => _playing = !_playing),
-                child: Turntable(vinyl: v, playing: _playing),
+                onTap: _toggle,
+                child: v.hasAudio
+                    ? StreamBuilder<bool>(
+                        stream: _audio.player.playingStream,
+                        initialData: false,
+                        builder: (_, s) => Turntable(vinyl: v, playing: s.data ?? false),
+                      )
+                    : Turntable(vinyl: v, playing: _simPlaying),
               ),
             ),
             Expanded(
@@ -79,7 +123,11 @@ class _StageScreenState extends State<StageScreen> {
                         height: s,
                         child: Hero(
                           tag: 'cover-${v.id}',
-                          child: _FlipCover(vinyl: v, flipped: _flipped),
+                          child: _FlipCover(
+                            vinyl: v,
+                            flipped: _flipped,
+                            onTrack: _playTrack,
+                          ),
                         ),
                       ),
                     ),
@@ -87,35 +135,12 @@ class _StageScreenState extends State<StageScreen> {
                 },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          v.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                        ),
-                        Text(
-                          '${v.artist} · ${v.year}',
-                          style: const TextStyle(color: Colors.white60),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton.filled(
-                    iconSize: 30,
-                    icon: Icon(_playing ? Icons.pause : Icons.play_arrow),
-                    onPressed: () => setState(() => _playing = !_playing),
-                  ),
-                ],
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
               ),
-            ),
+            _Controls(vinyl: v, audio: _audio, onToggle: _toggle, simPlaying: _simPlaying),
           ],
         ),
       ),
@@ -123,11 +148,124 @@ class _StageScreenState extends State<StageScreen> {
   }
 }
 
+class _Controls extends StatelessWidget {
+  const _Controls({
+    required this.vinyl,
+    required this.audio,
+    required this.onToggle,
+    required this.simPlaying,
+  });
+
+  final Vinyl vinyl;
+  final PlayerService audio;
+  final VoidCallback onToggle;
+  final bool simPlaying;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = audio.player;
+    final v = vinyl;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Column(
+        children: [
+          if (v.hasAudio)
+            StreamBuilder<Duration>(
+              stream: p.positionStream,
+              builder: (_, s) {
+                final dur = p.duration ?? Duration.zero;
+                final maxMs = dur.inMilliseconds.toDouble();
+                final pos = (s.data ?? Duration.zero).inMilliseconds.toDouble();
+                return Slider(
+                  value: maxMs > 0 ? pos.clamp(0.0, maxMs).toDouble() : 0,
+                  max: maxMs > 0 ? maxMs : 1,
+                  onChanged: (x) => p.seek(Duration(milliseconds: x.round())),
+                );
+              },
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: v.hasAudio
+                    ? StreamBuilder<int?>(
+                        stream: p.currentIndexStream,
+                        builder: (_, s) {
+                          final i = s.data ?? 0;
+                          final t = i < v.tracks.length ? v.tracks[i] : v.title;
+                          return _Info(title: t, sub: '${v.artist} · ${v.title}');
+                        },
+                      )
+                    : _Info(title: v.title, sub: '${v.artist}  ${v.yearLabel}'),
+              ),
+              if (v.hasAudio) ...[
+                IconButton(
+                  icon: const Icon(Icons.skip_previous),
+                  onPressed: p.seekToPrevious,
+                ),
+                StreamBuilder<bool>(
+                  stream: p.playingStream,
+                  initialData: false,
+                  builder: (_, s) => IconButton.filled(
+                    iconSize: 30,
+                    icon: Icon((s.data ?? false) ? Icons.pause : Icons.play_arrow),
+                    onPressed: onToggle,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.skip_next),
+                  onPressed: p.seekToNext,
+                ),
+              ] else
+                IconButton.filled(
+                  iconSize: 30,
+                  icon: Icon(simPlaying ? Icons.pause : Icons.play_arrow),
+                  onPressed: onToggle,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Info extends StatelessWidget {
+  const _Info({required this.title, required this.sub});
+  final String title;
+  final String sub;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+        ),
+        Text(
+          sub,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white60),
+        ),
+      ],
+    );
+  }
+}
+
 class _FlipCover extends StatelessWidget {
-  const _FlipCover({required this.vinyl, required this.flipped});
+  const _FlipCover({
+    required this.vinyl,
+    required this.flipped,
+    required this.onTrack,
+  });
 
   final Vinyl vinyl;
   final bool flipped;
+  final ValueChanged<int> onTrack;
 
   @override
   Widget build(BuildContext context) {
@@ -146,7 +284,7 @@ class _FlipCover extends StatelessWidget {
               ? Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.rotationY(math.pi),
-                  child: _Back(vinyl: vinyl),
+                  child: _Back(vinyl: vinyl, onTrack: onTrack),
                 )
               : CoverArt(vinyl: vinyl),
         );
@@ -156,8 +294,9 @@ class _FlipCover extends StatelessWidget {
 }
 
 class _Back extends StatelessWidget {
-  const _Back({required this.vinyl});
+  const _Back({required this.vinyl, required this.onTrack});
   final Vinyl vinyl;
+  final ValueChanged<int> onTrack;
 
   @override
   Widget build(BuildContext context) {
@@ -179,9 +318,12 @@ class _Back extends StatelessWidget {
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 itemCount: vinyl.tracks.length,
-                itemBuilder: (_, i) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Text('${i + 1}.  ${vinyl.tracks[i]}'),
+                itemBuilder: (_, i) => InkWell(
+                  onTap: () => onTrack(i),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Text('${i + 1}.  ${vinyl.tracks[i]}'),
+                  ),
                 ),
               ),
             ),
@@ -220,7 +362,7 @@ class DetailSheet extends StatelessWidget {
                   v.title,
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                 ),
-                Text('${v.year}', style: const TextStyle(color: Colors.white60)),
+                Text(v.yearLabel, style: const TextStyle(color: Colors.white60)),
                 const SizedBox(height: 14),
                 Row(
                   children: [
