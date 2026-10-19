@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../data/koofr_settings.dart';
 import '../models/vinyl.dart';
 import 'cover_art.dart';
 
@@ -158,14 +157,7 @@ class _Label extends StatelessWidget {
     return ClipOval(
       child: url == null
           ? fallback
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              cacheWidth: 300,
-              headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
-              errorBuilder: (_, __, ___) => fallback,
-              loadingBuilder: (_, child, p) => p == null ? child : fallback,
-            ),
+          : buildCoverImage(url, cacheWidth: 300, fallback: fallback),
     );
   }
 }

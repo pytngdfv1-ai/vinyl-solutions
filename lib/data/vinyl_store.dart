@@ -77,7 +77,7 @@ class VinylStore extends ChangeNotifier {
   /// Reemplaza los discos de Koofr por el resultado del último escaneo.
   Future<void> replaceRemote(List<Vinyl> scanned) async {
     final owned = {for (final v in _items) v.id: v.owned};
-    final local = _items.where((v) => !v.hasAudio).toList();
+    final local = _items.where((v) => !v.id.startsWith('dav_')).toList();
     final remote = [
       for (final v in scanned) v.copyWith(owned: owned[v.id] ?? true),
     ];
@@ -87,7 +87,19 @@ class VinylStore extends ChangeNotifier {
   }
 
   Future<void> clearRemote() async {
-    _items = _items.where((v) => !v.hasAudio).toList();
+    _items = _items.where((v) => !v.id.startsWith('dav_')).toList();
+    notifyListeners();
+    await _save();
+  }
+
+  /// Agrega (o actualiza) álbumes, por ejemplo de una carpeta local.
+  Future<void> addAlbums(List<Vinyl> albums) async {
+    final ids = {for (final a in albums) a.id};
+    final owned = {for (final v in _items) v.id: v.owned};
+    _items = [
+      for (final a in albums) a.copyWith(owned: owned[a.id] ?? true),
+      ..._items.where((v) => !ids.contains(v.id)),
+    ];
     notifyListeners();
     await _save();
   }

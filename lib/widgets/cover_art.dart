@@ -1,7 +1,35 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../data/koofr_settings.dart';
 import '../models/vinyl.dart';
+
+/// Imagen de portada: archivo local (file://) o red (Koofr / internet).
+Widget buildCoverImage(
+  String url, {
+  required int cacheWidth,
+  required Widget fallback,
+}) {
+  if (url.startsWith('file:')) {
+    return Image.file(
+      File(Uri.parse(url).toFilePath()),
+      fit: BoxFit.cover,
+      cacheWidth: cacheWidth,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => fallback,
+    );
+  }
+  return Image.network(
+    url,
+    headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
+    fit: BoxFit.cover,
+    cacheWidth: cacheWidth,
+    gaplessPlayback: true,
+    errorBuilder: (_, __, ___) => fallback,
+    loadingBuilder: (_, child, p) => p == null ? child : fallback,
+  );
+}
 
 Color hueColor(double hue, double s, double l) =>
     HSLColor.fromAHSL(1, hue % 360, s, l).toColor();
@@ -20,15 +48,7 @@ class CoverArt extends StatelessWidget {
     if (url == null) return art;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: Image.network(
-        url,
-        headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
-        fit: BoxFit.cover,
-        cacheWidth: 700,
-        gaplessPlayback: true,
-        errorBuilder: (_, __, ___) => art,
-        loadingBuilder: (_, child, p) => p == null ? child : art,
-      ),
+      child: buildCoverImage(url, cacheWidth: 700, fallback: art),
     );
   }
 
