@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../data/koofr_settings.dart';
+import 'cover_image.dart';
 import '../models/vinyl.dart';
 
 Color hueColor(double hue, double s, double l) =>
@@ -20,15 +20,7 @@ class CoverArt extends StatelessWidget {
     if (url == null) return art;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: Image.network(
-        url,
-        headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
-        fit: BoxFit.cover,
-        cacheWidth: 700,
-        gaplessPlayback: true,
-        errorBuilder: (_, __, ___) => art,
-        loadingBuilder: (_, child, p) => p == null ? child : art,
-      ),
+      child: CoverImage(url: url, fallback: art, cacheWidth: 700),
     );
   }
 

@@ -4,6 +4,7 @@ import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/crate_view.dart';
 import 'koofr_screen.dart';
+import 'local_screen.dart';
 import 'stage_screen.dart';
 
 enum _Filter { all, owned }
@@ -76,6 +77,13 @@ class _CrateScreenState extends State<CrateScreen> {
     if (ok == true) await widget.store.clearAll();
   }
 
+  void _openLocal() {
+    setState(() => _menuOpen = false);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => LocalScreen(store: widget.store)),
+    );
+  }
+
   void _openKoofr() {
     setState(() => _menuOpen = false);
     Navigator.of(context).push(
@@ -146,6 +154,14 @@ class _CrateScreenState extends State<CrateScreen> {
                     },
                   ),
                   ListTile(
+                    leading: const Icon(Icons.folder_open),
+                    title: const Text('Archivos locales'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _openLocal();
+                    },
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.cloud_outlined),
                     title: const Text('Conectar Koofr'),
                     onTap: () {
@@ -211,6 +227,8 @@ class _CrateScreenState extends State<CrateScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (_menuOpen) ...[
+                        _Pill(label: 'Archivos locales', icon: Icons.folder_open, onTap: _openLocal),
+                        const SizedBox(height: 8),
                         _Pill(label: 'Conectar Koofr', icon: Icons.cloud_outlined, onTap: _openKoofr),
                         const SizedBox(height: 8),
                         _Pill(label: 'Agregar disco', icon: Icons.add, onTap: _add),

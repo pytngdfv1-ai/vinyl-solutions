@@ -17,18 +17,22 @@ class PlayerService {
       await player.seek(Duration.zero, index: index);
       return;
     }
-    await _preflight(v.trackUrls[index]);
+    if (_isRemote(v.trackUrls[index])) await _preflight(v.trackUrls[index]);
     // LockCachingAudioSource descarga desde Dart (con credenciales) y sirve
     // el audio al reproductor; evita fallos de autenticación en redirecciones.
     final source = ConcatenatingAudioSource(
       children: [
         for (final url in v.trackUrls)
-          LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.activeHeaders),
+          _isRemote(url)
+              ? LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.activeHeaders)
+              : AudioSource.uri(Uri.file(url.replaceFirst('file://', ''))),
       ],
     );
     await player.setAudioSource(source, initialIndex: index);
     _loadedId = v.id;
   }
+
+  bool _isRemote(String url) => url.startsWith('http');
 
   /// Comprueba que Koofr responde antes de reproducir (mensaje claro si falla).
   Future<void> _preflight(String url) async {
