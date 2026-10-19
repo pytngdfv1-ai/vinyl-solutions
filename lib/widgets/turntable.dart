@@ -2,15 +2,55 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../data/koofr_settings.dart';
 import '../models/vinyl.dart';
 import 'cover_art.dart';
 
-/// Tornamesa: el disco gira y el brazo baja al reproducir.
+/// Geometría compartida del tocadisco.
+class _Geo {
+  _Geo(Size s)
+      : w = s.width,
+        h = s.height;
+
+  final double w;
+  final double h;
+
+  Offset get center => Offset(w * 0.40, h * 0.52);
+  double get r => math.min(w * 0.36, h * 0.46);
+  Offset get pivot => Offset(w * 0.9, h * 0.12);
+
+  double get _dist => (pivot - center).distance;
+  double get _a0 => math.atan2(pivot.dx - center.dx, center.dy - pivot.dy);
+
+  /// Largo del brazo: llega hasta cerca de la etiqueta (surco interior).
+  double get armLen => _dist - r * 0.42;
+
+  /// Ángulo del brazo para que la aguja quede a [rad] del centro del disco.
+  double angleFor(double rad) {
+    final c = ((armLen * armLen + _dist * _dist - rad * rad) / (2 * armLen * _dist))
+        .clamp(-1.0, 1.0)
+        .toDouble();
+    return _a0 - math.acos(c);
+  }
+
+  Offset tip(double a) => pivot + Offset(-math.sin(a), math.cos(a)) * armLen;
+}
+
+/// Tocadisco: el disco gira, la etiqueta lleva la portada y el brazo avanza
+/// del borde exterior al centro a medida que avanza el tema.
 class Turntable extends StatefulWidget {
-  const Turntable({super.key, required this.vinyl, required this.playing});
+  const Turntable({
+    super.key,
+    required this.vinyl,
+    required this.playing,
+    this.progress = 0,
+  });
 
   final Vinyl vinyl;
   final bool playing;
+
+  /// Avance del tema actual (0 = inicio, 1 = final).
+  final double progress;
 
   @override
   State<Turntable> createState() => _TurntableState();
@@ -23,7 +63,7 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
   );
   late final AnimationController _arm = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
+    duration: const Duration(milliseconds: 800),
   );
 
   @override
@@ -59,31 +99,85 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 1.5,
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_spin, _arm]),
-        builder: (context, _) => CustomPaint(
-          painter: _TurntablePainter(
-            hue: widget.vinyl.hue,
-            spin: _spin.value,
-            arm: Curves.easeInOut.transform(_arm.value),
-          ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final g = _Geo(Size(c.maxWidth, c.maxHeight));
+          final lr = g.r * 0.34;
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _spin,
+                  builder: (_, __) => CustomPaint(
+                    painter: _DiscPainter(spin: _spin.value),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: g.center.dx - lr,
+                top: g.center.dy - lr,
+                width: lr * 2,
+                height: lr * 2,
+                child: RotationTransition(
+                  turns: _spin,
+                  child: _Label(vinyl: widget.vinyl),
+                ),
+              ),
+              Positioned.fill(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: widget.progress),
+                  duration: const Duration(milliseconds: 300),
+                  builder: (_, p, __) => AnimatedBuilder(
+                    animation: _arm,
+                    builder: (_, __) => CustomPaint(
+                      painter: _ArmPainter(
+                        progress: p,
+                        arm: Curves.easeInOut.transform(_arm.value),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class _TurntablePainter extends CustomPainter {
-  _TurntablePainter({required this.hue, required this.spin, required this.arm});
+/// Etiqueta redonda del disco con la portada del álbum.
+class _Label extends StatelessWidget {
+  const _Label({required this.vinyl});
+  final Vinyl vinyl;
 
-  final double hue;
+  @override
+  Widget build(BuildContext context) {
+    final fallback = ColoredBox(color: hueColor(vinyl.hue, 0.7, 0.5));
+    final url = vinyl.coverUrl;
+    return ClipOval(
+      child: url == null
+          ? fallback
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              cacheWidth: 300,
+              headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
+              errorBuilder: (_, __, ___) => fallback,
+              loadingBuilder: (_, child, p) => p == null ? child : fallback,
+            ),
+    );
+  }
+}
+
+class _DiscPainter extends CustomPainter {
+  _DiscPainter({required this.spin});
+
   final double spin;
-  final double arm;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
+    final g = _Geo(size);
     final body = Offset.zero & size;
 
     canvas.drawRRect(
@@ -96,14 +190,11 @@ class _TurntablePainter extends CustomPainter {
         ).createShader(body),
     );
 
-    final center = Offset(w * 0.40, h * 0.52);
-    final r = math.min(w * 0.36, h * 0.46);
+    final r = g.r;
+    canvas.drawCircle(g.center, r * 1.07, Paint()..color = const Color(0xFF2B2B2B));
 
-    canvas.drawCircle(center, r * 1.07, Paint()..color = const Color(0xFF2B2B2B));
-
-    // Disco girando.
     canvas.save();
-    canvas.translate(center.dx, center.dy);
+    canvas.translate(g.center.dx, g.center.dy);
     canvas.rotate(spin * 2 * math.pi);
     final disc = Rect.fromCircle(center: Offset.zero, radius: r);
     canvas.drawCircle(Offset.zero, r, Paint()..color = const Color(0xFF101010));
@@ -129,31 +220,57 @@ class _TurntablePainter extends CustomPainter {
     for (var k = 0; k < 7; k++) {
       canvas.drawCircle(Offset.zero, r * (0.4 + 0.085 * k), groove);
     }
-    canvas.drawCircle(Offset.zero, r * 0.34, Paint()..color = hueColor(hue, 0.7, 0.5));
-    canvas.drawCircle(Offset(r * 0.2, 0), r * 0.03, Paint()..color = Colors.white70);
-    canvas.drawCircle(Offset.zero, r * 0.04, Paint()..color = const Color(0xFFD0D0D0));
     canvas.restore();
-
-    // Brazo.
-    final pivot = Offset(w * 0.9, h * 0.12);
-    final target = Offset(center.dx + r * 0.55, center.dy);
-    final len = (target - pivot).distance;
-    final aPlay = math.atan2(pivot.dx - target.dx, target.dy - pivot.dy);
-    final a = aPlay * (0.35 + 0.65 * arm);
-    final tip = pivot + Offset(-math.sin(a), math.cos(a)) * len;
-
-    final armPaint = Paint()
-      ..color = const Color(0xFFEDEDED)
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(pivot + const Offset(2, 3), tip + const Offset(2, 3),
-        Paint()..color = Colors.black26..strokeWidth = 5..strokeCap = StrokeCap.round);
-    canvas.drawLine(pivot, tip, armPaint);
-    canvas.drawCircle(pivot, 13, Paint()..color = const Color(0xFF6E6E6E));
-    canvas.drawCircle(pivot, 7, Paint()..color = const Color(0xFFD8D8D8));
-    canvas.drawCircle(tip, 5, Paint()..color = const Color(0xFF222222));
   }
 
   @override
-  bool shouldRepaint(covariant _TurntablePainter old) => true;
+  bool shouldRepaint(covariant _DiscPainter old) => old.spin != spin;
+}
+
+class _ArmPainter extends CustomPainter {
+  _ArmPainter({required this.progress, required this.arm});
+
+  final double progress;
+  final double arm;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final g = _Geo(size);
+    final r = g.r;
+
+    // Agujero central sobre la etiqueta.
+    canvas.drawCircle(g.center, r * 0.035, Paint()..color = const Color(0xFFD0D0D0));
+
+    // Surco exterior (inicio del tema) -> surco interior (final del tema).
+    final aPlay = g.angleFor(r * (0.93 - 0.51 * progress.clamp(0.0, 1.0)));
+    final aRest = g.angleFor(r * 0.93) - 0.30; // brazo fuera del disco
+    final a = aRest + (aPlay - aRest) * arm;
+
+    final tip = g.tip(a);
+    final dir = Offset(-math.sin(a), math.cos(a));
+
+    final line = Paint()
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      g.pivot + const Offset(2, 3),
+      tip + const Offset(2, 3),
+      line..color = Colors.black26,
+    );
+    canvas.drawLine(g.pivot, tip, line..color = const Color(0xFFEDEDED));
+    canvas.drawLine(
+      tip - dir * 12,
+      tip,
+      Paint()
+        ..color = const Color(0xFF2A2A2A)
+        ..strokeWidth = 9
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(g.pivot, 13, Paint()..color = const Color(0xFF6E6E6E));
+    canvas.drawCircle(g.pivot, 7, Paint()..color = const Color(0xFFD8D8D8));
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArmPainter old) =>
+      old.progress != progress || old.arm != arm;
 }

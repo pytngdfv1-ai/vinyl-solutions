@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../audio/player_service.dart';
 import '../data/vinyl_store.dart';
@@ -43,6 +45,11 @@ class _StageScreenState extends State<StageScreen> {
     }
     try {
       await _audio.load(v);
+      _lastIndex = _audio.player.currentIndex ?? 0;
+      _subs.add(_audio.player.currentIndexStream.listen(_onIndex));
+      _subs.add(_audio.player.processingStateStream.listen((st) {
+        if (st == ProcessingState.completed) _onCompleted();
+      }));
       _audio.player.play();
     } catch (e) {
       if (mounted) setState(() => _error = 'No se pudo reproducir: $e');
@@ -51,8 +58,78 @@ class _StageScreenState extends State<StageScreen> {
 
   @override
   void dispose() {
+    for (final s in _subs) {
+      s.cancel();
+    }
     if (v.hasAudio) _audio.stop();
     super.dispose();
+  }
+
+  final List<StreamSubscription<Object?>> _subs = [];
+  int? _lastIndex;
+  bool _changing = false;
+
+  /// Cambio manual: el brazo vuelve al reposo, cambia el tema y baja de nuevo.
+  Future<void> _goTrack(int i) async {
+    if (!v.hasAudio || _changing || i < 0 || i >= v.tracks.length) return;
+    _changing = true;
+    final p = _audio.player;
+    await p.pause(); // el brazo se levanta
+    await Future.delayed(const Duration(milliseconds: 900));
+    _lastIndex = i;
+    await p.seek(Duration.zero, index: i);
+    await Future.delayed(const Duration(milliseconds: 300));
+    _changing = false;
+    if (mounted) p.play(); // el brazo baja al borde exterior
+  }
+
+  /// El reproductor pasó solo al siguiente tema: repite la animación.
+  void _onIndex(int? i) {
+    if (i == null) return;
+    final prev = _lastIndex;
+    _lastIndex = i;
+    if (prev == null || prev == i || _changing) return;
+    _autoAdvance();
+  }
+
+  Future<void> _autoAdvance() async {
+    _changing = true;
+    final p = _audio.player;
+    await p.pause();
+    await Future.delayed(const Duration(milliseconds: 900));
+    await p.seek(Duration.zero);
+    await Future.delayed(const Duration(milliseconds: 300));
+    _changing = false;
+    if (mounted) p.play();
+  }
+
+  /// Terminó el último tema: el brazo vuelve al reposo.
+  Future<void> _onCompleted() async {
+    if (_changing) return;
+    _changing = true;
+    final p = _audio.player;
+    await p.pause();
+    _lastIndex = 0;
+    await p.seek(Duration.zero, index: 0);
+    _changing = false;
+  }
+
+  Widget _turntable() {
+    if (!v.hasAudio) return Turntable(vinyl: v, playing: _simPlaying, progress: 0);
+    final p = _audio.player;
+    return StreamBuilder<bool>(
+      stream: p.playingStream,
+      initialData: false,
+      builder: (_, ps) => StreamBuilder<Duration>(
+        stream: p.positionStream,
+        builder: (_, pos) {
+          final dur = p.duration?.inMilliseconds ?? 0;
+          final cur = (pos.data ?? Duration.zero).inMilliseconds;
+          final prog = dur > 0 ? (cur / dur).clamp(0.0, 1.0).toDouble() : 0.0;
+          return Turntable(vinyl: v, playing: ps.data ?? false, progress: prog);
+        },
+      ),
+    );
   }
 
   void _toggle() {
@@ -64,11 +141,10 @@ class _StageScreenState extends State<StageScreen> {
     p.playing ? p.pause() : p.play();
   }
 
-  Future<void> _playTrack(int i) async {
-    if (!v.hasAudio) return;
-    await _audio.player.seek(Duration.zero, index: i);
-    _audio.player.play();
-  }
+  Future<void> _playTrack(int i) => _goTrack(i);
+
+  void _prev() => _goTrack((_audio.player.currentIndex ?? 0) - 1);
+  void _next() => _goTrack((_audio.player.currentIndex ?? 0) + 1);
 
   @override
   Widget build(BuildContext context) {
@@ -102,13 +178,7 @@ class _StageScreenState extends State<StageScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
                 onTap: _toggle,
-                child: v.hasAudio
-                    ? StreamBuilder<bool>(
-                        stream: _audio.player.playingStream,
-                        initialData: false,
-                        builder: (_, s) => Turntable(vinyl: v, playing: s.data ?? false),
-                      )
-                    : Turntable(vinyl: v, playing: _simPlaying),
+                child: _turntable(),
               ),
             ),
             Expanded(
@@ -140,7 +210,14 @@ class _StageScreenState extends State<StageScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
               ),
-            _Controls(vinyl: v, audio: _audio, onToggle: _toggle, simPlaying: _simPlaying),
+            _Controls(
+              vinyl: v,
+              audio: _audio,
+              onToggle: _toggle,
+              onPrev: _prev,
+              onNext: _next,
+              simPlaying: _simPlaying,
+            ),
           ],
         ),
       ),
@@ -153,12 +230,16 @@ class _Controls extends StatelessWidget {
     required this.vinyl,
     required this.audio,
     required this.onToggle,
+    required this.onPrev,
+    required this.onNext,
     required this.simPlaying,
   });
 
   final Vinyl vinyl;
   final PlayerService audio;
   final VoidCallback onToggle;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
   final bool simPlaying;
 
   @override
@@ -200,7 +281,7 @@ class _Controls extends StatelessWidget {
               if (v.hasAudio) ...[
                 IconButton(
                   icon: const Icon(Icons.skip_previous),
-                  onPressed: p.seekToPrevious,
+                  onPressed: onPrev,
                 ),
                 StreamBuilder<bool>(
                   stream: p.playingStream,
@@ -213,7 +294,7 @@ class _Controls extends StatelessWidget {
                 ),
                 IconButton(
                   icon: const Icon(Icons.skip_next),
-                  onPressed: p.seekToNext,
+                  onPressed: onNext,
                 ),
               ] else
                 IconButton.filled(
