@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/library_settings.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/crate_view.dart';
@@ -52,6 +53,50 @@ class _CrateScreenState extends State<CrateScreen> {
       ),
     );
     if (ok == true) await widget.store.remove(v.id);
+  }
+
+  Future<void> _openSettings() async {
+    var value = LibrarySettings.minTracks.toDouble();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Ajustes de biblioteca'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Mínimo de temas por álbum: ${value.round()}'),
+              const SizedBox(height: 4),
+              const Text(
+                'Las carpetas con menos temas (singles, temas sueltos) se ignoran '
+                'al sincronizar o agregar una carpeta.',
+                style: TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+              Slider(
+                value: value,
+                min: 1,
+                max: 15,
+                divisions: 14,
+                label: '${value.round()}',
+                onChanged: (v) => setLocal(() => value = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) await LibrarySettings.save(value.round());
   }
 
   Future<void> _confirmClear() async {
@@ -143,6 +188,14 @@ class _CrateScreenState extends State<CrateScreen> {
                     onTap: () {
                       setState(() => _filter = _Filter.owned);
                       Navigator.of(context).pop();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.tune),
+                    title: const Text('Ajustes de biblioteca'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _openSettings();
                     },
                   ),
                   ListTile(

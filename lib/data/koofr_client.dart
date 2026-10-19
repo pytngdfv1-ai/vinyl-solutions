@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
-import '../models/vinyl.dart';
-import 'cover_lookup.dart';
-import 'library_utils.dart';
+import 'album_builder.dart';
+import 'flac_meta.dart';
+import 'library_settings.dart';
 import 'koofr_settings.dart';
 
 class KoofrException implements Exception {
@@ -93,28 +94,48 @@ class KoofrClient {
     return out;
   }
 
-  Future<List<Vinyl>> scan({void Function(String)? onProgress}) async {
+  Future<ScanResult> scan({void Function(String)? onProgress}) async {
     _dirs = 0;
     _filesSeen = 0;
+    _skipped = 0;
     final top = await _list(_musicDir());
     final topDirs = top.where((e) => e.isDir).length;
     final topFiles = top.where((e) => !e.isDir).length;
     final sample = top.take(4).map((e) => e.name).join(', ');
 
-    final out = <Vinyl>[];
-    await _walk(_musicDir(), top, <String>[], out, onProgress);
+    final drafts = <AlbumDraft>[];
+    await _walk(_musicDir(), top, <String>[], drafts, onProgress);
 
+    final result = await buildAlbums(drafts, skippedBefore: _skipped, onProgress: onProgress);
     diagnostic = 'En "${settings.folder}" vi $topDirs carpetas y $topFiles archivos'
         '${sample.isEmpty ? '' : ' (ej.: $sample)'}. '
         'Revisé $_dirs carpetas y $_filesSeen archivos en total.';
-    return out;
+    return result;
   }
+
+  int _skipped = 0;
+
+  /// Lector de rangos HTTP para leer solo el inicio de un FLAC.
+  RangeReader _reader(Uri uri) => buffered((start, length) async {
+        final req = http.Request('GET', uri)
+          ..headers.addAll({
+            ...settings.headers,
+            'Range': 'bytes=$start-${start + length - 1}',
+          });
+        final res = await _http.send(req).timeout(const Duration(seconds: 25));
+        if (res.statusCode != 206) {
+          await res.stream.listen((_) {}).cancel();
+          return null;
+        }
+        final Uint8List bytes = await res.stream.toBytes();
+        return bytes;
+      });
 
   Future<void> _walk(
     Uri dir,
     List<_Entry> entries,
     List<String> names,
-    List<Vinyl> out,
+    List<AlbumDraft> out,
     void Function(String)? onProgress,
   ) async {
     _dirs++;
@@ -126,32 +147,29 @@ class KoofrClient {
       ..sort((a, b) => a.name.compareTo(b.name));
 
     if (audio.isNotEmpty) {
-      final images = entries
-          .where((e) => !e.isDir && _imageExt.any((x) => e.name.toLowerCase().endsWith(x)))
-          .toList();
-      final pref = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
-      final art = images.where((e) => pref.hasMatch(e.name)).firstOrNull ??
-          images.firstOrNull;
-
-      final rootName = settings.folder.split('/').where((s) => s.isNotEmpty).lastOrNull ??
-          'Música';
-      final album = names.isNotEmpty ? names.last : rootName;
-      var artist = names.length >= 2 ? names[names.length - 2] : 'Artista desconocido';
-      if (artist == 'Artista desconocido') {
-        artist = guessArtist([for (final t in audio) t.name]) ?? artist;
+      // Audio suelto en la carpeta elegida, o muy pocos temas: no es un álbum.
+      if (names.isEmpty || audio.length < LibrarySettings.minTracks) {
+        _skipped++;
+      } else {
+        final images = entries
+            .where((e) => !e.isDir && _imageExt.any((x) => e.name.toLowerCase().endsWith(x)))
+            .toList();
+        final pref = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
+        final art = images.where((e) => pref.hasMatch(e.name)).firstOrNull ?? images.firstOrNull;
+        final first = audio.first;
+        out.add(AlbumDraft(
+          key: names.join('/'),
+          idPrefix: 'dav_',
+          folderArtist: names.length >= 2 ? names[names.length - 2] : null,
+          folderAlbum: names.last,
+          trackFiles: [for (final t in audio) t.name],
+          trackUrls: [for (final t in audio) t.uri.toString()],
+          folderImageUrl: art?.uri.toString(),
+          readMeta: first.name.toLowerCase().endsWith('.flac')
+              ? () => readFlacMeta(_reader(first.uri))
+              : null,
+        ));
       }
-      final key = names.isEmpty ? rootName : names.join('/');
-      out.add(Vinyl(
-        id: 'dav_${base64Url.encode(utf8.encode(key))}',
-        title: album,
-        artist: artist,
-        year: _year(album),
-        hue: (key.codeUnits.fold<int>(0, (s, c) => s + c) % 360).toDouble(),
-        tracks: [for (final t in audio) _title(t.name)],
-        trackUrls: [for (final t in audio) t.uri.toString()],
-        coverUrl: art?.uri.toString() ?? await CoverLookup.find(artist, album),
-        owned: true,
-      ));
     }
 
     if (names.length >= _maxDepth) return;
@@ -161,16 +179,5 @@ class KoofrClient {
       final sub = await _list(d.uri);
       await _walk(d.uri, sub, [...names, d.name], out, onProgress);
     }
-  }
-
-  static int _year(String s) {
-    final m = RegExp(r'(19|20)\d{2}').firstMatch(s);
-    return m == null ? 0 : int.parse(m.group(0)!);
-  }
-
-  static String _title(String file) {
-    var t = file.replaceFirst(RegExp(r'\.[A-Za-z0-9]{2,4}$'), '');
-    t = t.replaceFirst(RegExp(r'^\d+\s*[-._)]*\s*'), '');
-    return t.isEmpty ? file : t;
   }
 }

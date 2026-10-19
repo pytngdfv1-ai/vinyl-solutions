@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../data/library_settings.dart';
 import '../data/local_scanner.dart';
 import '../data/vinyl_store.dart';
 
@@ -50,17 +51,19 @@ class _LocalScreenState extends State<LocalScreen> {
       }
       setState(() => _status = 'Leyendo carpeta…');
       final scanner = LocalScanner();
-      final albums = await scanner.scan(
+      final result = await scanner.scan(
         path,
         onProgress: (n) {
           if (mounted) setState(() => _status = 'Leyendo $n…');
         },
       );
-      await widget.store.addAlbums(albums);
+      await widget.store.addAlbums(result.albums);
       if (!mounted) return;
-      setState(() => _status = albums.isEmpty
-          ? 'No encontré audio. ${scanner.diagnostic}\nSi hay música en la carpeta, toca "Permitir acceso a todos los archivos".'
-          : '${albums.length} álbumes agregados a tu biblioteca.');
+      setState(() => _status = result.albums.isEmpty
+          ? 'No encontré álbumes completos. ${scanner.diagnostic}\n'
+              '${result.summary(LibrarySettings.minTracks)}\n'
+              'Si hay música en la carpeta, toca "Permitir acceso a todos los archivos".'
+          : result.summary(LibrarySettings.minTracks));
     } on LocalException catch (e) {
       if (mounted) setState(() => _status = e.message);
     } catch (e) {
