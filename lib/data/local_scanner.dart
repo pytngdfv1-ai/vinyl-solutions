@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 
-import '../models/vinyl.dart';
-import 'cover_lookup.dart';
-import 'library_utils.dart';
+import 'album_builder.dart';
+import 'flac_meta.dart';
+import 'library_settings.dart';
 
 class LocalException implements Exception {
   const LocalException(this.message);
@@ -12,16 +11,15 @@ class LocalException implements Exception {
   String toString() => message;
 }
 
-/// Lee una carpeta del teléfono: cada carpeta con audio es un álbum y su
-/// carpeta padre es el artista.
+/// Lee una carpeta del teléfono. Solo toma álbumes completos:
+/// Artista/Álbum/temas (con al menos [LibrarySettings.minTracks] temas).
 class LocalScanner {
   static const _audioExt = ['.flac', '.mp3', '.m4a', '.ogg', '.opus', '.wav', '.aac'];
   static const _imageExt = ['.jpg', '.jpeg', '.png', '.webp'];
 
-  /// Resumen de lo visto (para diagnóstico).
   String diagnostic = '';
 
-  Future<List<Vinyl>> scan(String rootPath, {void Function(String)? onProgress}) async {
+  Future<ScanResult> scan(String rootPath, {void Function(String)? onProgress}) async {
     final root = Directory(rootPath);
     if (!await root.exists()) {
       throw const LocalException('No se puede abrir la carpeta');
@@ -39,7 +37,10 @@ class LocalScanner {
     }
 
     final rootName = _base(rootPath);
-    final out = <Vinyl>[];
+    final min = LibrarySettings.minTracks;
+    final drafts = <AlbumDraft>[];
+    var skipped = 0;
+
     final dirs = byDir.keys.toList()..sort();
     for (final dir in dirs) {
       final list = byDir[dir]!;
@@ -49,12 +50,11 @@ class LocalScanner {
 
       final rel = dir.length > rootPath.length ? dir.substring(rootPath.length) : '';
       final names = rel.split('/').where((s) => s.isNotEmpty).toList();
-      final album = names.isNotEmpty ? names.last : rootName;
-      var artist = names.length >= 2 ? names[names.length - 2] : 'Artista desconocido';
-      if (artist == 'Artista desconocido') {
-        artist = guessArtist([for (final f in audio) _base(f.path)]) ?? artist;
+      // Audio suelto en la carpeta elegida, o muy pocos temas: no es un álbum.
+      if (names.isEmpty || audio.length < min) {
+        skipped++;
+        continue;
       }
-      onProgress?.call(album);
 
       final images = list.where((f) => _hasExt(f.path, _imageExt)).toList();
       final pref = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
@@ -67,25 +67,35 @@ class LocalScanner {
       }
       art ??= images.isEmpty ? null : images.first;
 
-      final cover = art != null
-          ? Uri.file(art.path).toString()
-          : await CoverLookup.find(artist, album);
-
-      out.add(Vinyl(
-        id: 'loc_${base64Url.encode(utf8.encode(dir))}',
-        title: album,
-        artist: artist,
-        year: _year(album),
-        hue: (dir.codeUnits.fold<int>(0, (s, c) => s + c) % 360).toDouble(),
-        tracks: [for (final f in audio) _title(_base(f.path))],
+      final first = audio.first.path;
+      drafts.add(AlbumDraft(
+        key: dir,
+        idPrefix: 'loc_',
+        folderArtist: names.length >= 2 ? names[names.length - 2] : null,
+        folderAlbum: names.last,
+        trackFiles: [for (final f in audio) _base(f.path)],
         trackUrls: [for (final f in audio) Uri.file(f.path).toString()],
-        coverUrl: cover,
-        owned: true,
+        folderImageUrl: art == null ? null : Uri.file(art.path).toString(),
+        readMeta: first.toLowerCase().endsWith('.flac') ? () => _meta(first) : null,
       ));
     }
 
-    diagnostic = 'Vi $files archivos en "$rootName" y ${out.length} álbumes con audio.';
-    return out;
+    final result = await buildAlbums(drafts, skippedBefore: skipped, onProgress: onProgress);
+    diagnostic = 'Vi $files archivos en "$rootName". '
+        'Álbumes completos: ${result.albums.length}.';
+    return result;
+  }
+
+  Future<FlacMeta?> _meta(String path) async {
+    final raf = await File(path).open();
+    try {
+      return await readFlacMeta(buffered((s, l) async {
+        await raf.setPosition(s);
+        return await raf.read(l);
+      }));
+    } finally {
+      await raf.close();
+    }
   }
 
   static String _base(String path) {
@@ -96,16 +106,5 @@ class LocalScanner {
   static bool _hasExt(String path, List<String> exts) {
     final p = path.toLowerCase();
     return exts.any(p.endsWith);
-  }
-
-  static int _year(String s) {
-    final m = RegExp(r'(19|20)\d{2}').firstMatch(s);
-    return m == null ? 0 : int.parse(m.group(0)!);
-  }
-
-  static String _title(String file) {
-    var t = file.replaceFirst(RegExp(r'\.[A-Za-z0-9]{2,4}$'), '');
-    t = t.replaceFirst(RegExp(r'^\d+\s*[-._)]*\s*'), '');
-    return t.isEmpty ? file : t;
   }
 }

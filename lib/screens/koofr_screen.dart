@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/koofr_client.dart';
+import '../data/library_settings.dart';
 import '../data/koofr_settings.dart';
 import '../data/vinyl_store.dart';
 
@@ -65,20 +66,21 @@ class _KoofrScreenState extends State<KoofrScreen> {
     });
     try {
       final client = KoofrClient(s);
-      final albums = await client.scan(
+      final result = await client.scan(
         onProgress: (name) {
           if (mounted) setState(() => _status = 'Leyendo $name…');
         },
       );
       await s.save();
-      await widget.store.replaceRemote(albums);
+      await widget.store.replaceRemote(result.albums);
       if (!mounted) return;
       setState(() {
         _connected = true;
         _password.clear();
-        _status = albums.isEmpty
-            ? 'Conectado, pero no encontré audio. ${client.diagnostic}'
-            : '${albums.length} álbumes agregados a tu biblioteca.';
+        _status = result.albums.isEmpty
+            ? 'Conectado, pero no encontré álbumes completos. ${client.diagnostic}\n'
+                '${result.summary(LibrarySettings.minTracks)}'
+            : result.summary(LibrarySettings.minTracks);
       });
     } on KoofrException catch (e) {
       if (mounted) setState(() => _status = e.message);
