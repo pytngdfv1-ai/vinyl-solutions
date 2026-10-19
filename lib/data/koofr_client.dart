@@ -5,6 +5,7 @@ import 'package:xml/xml.dart';
 
 import '../models/vinyl.dart';
 import 'cover_lookup.dart';
+import 'library_utils.dart';
 import 'koofr_settings.dart';
 
 class KoofrException implements Exception {
@@ -135,7 +136,10 @@ class KoofrClient {
       final rootName = settings.folder.split('/').where((s) => s.isNotEmpty).lastOrNull ??
           'Música';
       final album = names.isNotEmpty ? names.last : rootName;
-      final artist = names.length >= 2 ? names[names.length - 2] : 'Artista desconocido';
+      var artist = names.length >= 2 ? names[names.length - 2] : 'Artista desconocido';
+      if (artist == 'Artista desconocido') {
+        artist = guessArtist([for (final t in audio) t.name]) ?? artist;
+      }
       final key = names.isEmpty ? rootName : names.join('/');
       out.add(Vinyl(
         id: 'dav_${base64Url.encode(utf8.encode(key))}',

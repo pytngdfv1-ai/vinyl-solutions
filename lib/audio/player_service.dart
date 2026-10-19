@@ -17,13 +17,15 @@ class PlayerService {
       await player.seek(Duration.zero, index: index);
       return;
     }
-    await _preflight(v.trackUrls[index]);
+    if (!v.trackUrls[index].startsWith('file:')) await _preflight(v.trackUrls[index]);
     // LockCachingAudioSource descarga desde Dart (con credenciales) y sirve
     // el audio al reproductor; evita fallos de autenticación en redirecciones.
     final source = ConcatenatingAudioSource(
       children: [
         for (final url in v.trackUrls)
-          LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.activeHeaders),
+          url.startsWith('file:')
+              ? AudioSource.uri(Uri.parse(url))
+              : LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.activeHeaders),
       ],
     );
     await player.setAudioSource(source, initialIndex: index);
