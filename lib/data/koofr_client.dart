@@ -7,6 +7,7 @@ import 'package:xml/xml.dart';
 import 'album_builder.dart';
 import 'flac_meta.dart';
 import 'library_settings.dart';
+import 'library_utils.dart';
 import 'koofr_settings.dart';
 
 class KoofrException implements Exception {
@@ -156,6 +157,24 @@ class KoofrClient {
             .toList();
         final pref = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
         final art = images.where((e) => pref.hasMatch(e.name)).firstOrNull ?? images.firstOrNull;
+        // Libreto: resto de imágenes y PDFs, más los de subcarpetas "Libreto", "Booklet"…
+        final imgs = images.where((e) => e != art).toList()
+          ..sort((a, b) => naturalCompare(a.name, b.name));
+        final pdfs = entries.where((e) => !e.isDir && e.name.toLowerCase().endsWith('.pdf')).toList()
+          ..sort((a, b) => naturalCompare(a.name, b.name));
+        for (final d in entries.where((e) => e.isDir && isBookletDir(e.name))) {
+          try {
+            final sub = await _list(d.uri);
+            imgs.addAll(sub
+                .where((e) => !e.isDir && _imageExt.any((x) => e.name.toLowerCase().endsWith(x)))
+                .toList()
+              ..sort((a, b) => naturalCompare(a.name, b.name)));
+            pdfs.addAll(sub
+                .where((e) => !e.isDir && e.name.toLowerCase().endsWith('.pdf'))
+                .toList()
+              ..sort((a, b) => naturalCompare(a.name, b.name)));
+          } catch (_) {}
+        }
         final first = audio.first;
         out.add(AlbumDraft(
           key: names.join('/'),
@@ -165,6 +184,8 @@ class KoofrClient {
           trackFiles: [for (final t in audio) t.name],
           trackUrls: [for (final t in audio) t.uri.toString()],
           folderImageUrl: art?.uri.toString(),
+          bookletImages: [for (final e in imgs) e.uri.toString()],
+          pdfs: [for (final e in pdfs) e.uri.toString()],
           readMeta: first.name.toLowerCase().endsWith('.flac')
               ? () => readFlacMeta(_reader(first.uri))
               : null,

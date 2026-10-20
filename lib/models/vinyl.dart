@@ -9,6 +9,8 @@ class Vinyl {
     this.owned = false,
     this.trackUrls = const [],
     this.coverUrl,
+    this.booklet = const [],
+    this.pdfs = const [],
   });
 
   final String id;
@@ -23,6 +25,11 @@ class Vinyl {
   final List<String> trackUrls;
   final String? coverUrl;
 
+  /// Páginas del libreto (imágenes) y PDFs del álbum.
+  final List<String> booklet;
+  final List<String> pdfs;
+
+  bool get hasBooklet => booklet.isNotEmpty || pdfs.isNotEmpty;
   bool get hasAudio => trackUrls.isNotEmpty;
   String get yearLabel => year > 0 ? '$year' : '';
 
@@ -36,6 +43,8 @@ class Vinyl {
         owned: owned ?? this.owned,
         trackUrls: trackUrls,
         coverUrl: coverUrl,
+        booklet: booklet,
+        pdfs: pdfs,
       );
 
   Map<String, dynamic> toJson() => {
@@ -48,6 +57,8 @@ class Vinyl {
         'owned': owned,
         'trackUrls': trackUrls,
         'coverUrl': coverUrl,
+        'booklet': booklet,
+        'pdfs': pdfs,
       };
 
   factory Vinyl.fromJson(Map<String, dynamic> j) => Vinyl(
@@ -60,5 +71,7 @@ class Vinyl {
         owned: j['owned'] as bool? ?? false,
         trackUrls: (j['trackUrls'] as List?)?.cast<String>() ?? const [],
         coverUrl: j['coverUrl'] as String?,
+        booklet: (j['booklet'] as List?)?.cast<String>() ?? const [],
+        pdfs: (j['pdfs'] as List?)?.cast<String>() ?? const [],
       );
 }

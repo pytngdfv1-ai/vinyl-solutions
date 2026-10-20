@@ -3,6 +3,7 @@ import 'dart:io';
 import 'album_builder.dart';
 import 'flac_meta.dart';
 import 'library_settings.dart';
+import 'library_utils.dart';
 
 class LocalException implements Exception {
   const LocalException(this.message);
@@ -67,6 +68,25 @@ class LocalScanner {
       }
       art ??= images.isEmpty ? null : images.first;
 
+      // Libreto: el resto de imágenes y PDFs de la carpeta y de sus subcarpetas
+      // "Libreto", "Booklet", "Scans", "Artwork"…
+      final imgs = <File>[...images.where((f) => f != art)];
+      final pdfs = <File>[...list.where((f) => _hasExt(f.path, const ['.pdf']))];
+      imgs.sort((a, b) => naturalCompare(_base(a.path), _base(b.path)));
+      pdfs.sort((a, b) => naturalCompare(_base(a.path), _base(b.path)));
+      for (final sub in dirs.where((d) => d.startsWith('$dir/') && isBookletDir(_base(d)))) {
+        if (sub.substring(dir.length + 1).contains('/')) continue; // solo hijas directas
+        final sl = byDir[sub]!;
+        imgs.addAll(sl.where((f) => _hasExt(f.path, _imageExt))
+            .toList()..sort((a, b) => naturalCompare(_base(a.path), _base(b.path))));
+        pdfs.addAll(sl.where((f) => _hasExt(f.path, const ['.pdf']))
+            .toList()..sort((a, b) => naturalCompare(_base(a.path), _base(b.path))));
+      }
+      final booklet = (
+        [for (final f in imgs) Uri.file(f.path).toString()],
+        [for (final f in pdfs) Uri.file(f.path).toString()],
+      );
+
       final first = audio.first.path;
       drafts.add(AlbumDraft(
         key: dir,
@@ -76,6 +96,8 @@ class LocalScanner {
         trackFiles: [for (final f in audio) _base(f.path)],
         trackUrls: [for (final f in audio) Uri.file(f.path).toString()],
         folderImageUrl: art == null ? null : Uri.file(art.path).toString(),
+        bookletImages: booklet.$1,
+        pdfs: booklet.$2,
         readMeta: first.toLowerCase().endsWith('.flac') ? () => _meta(first) : null,
       ));
     }

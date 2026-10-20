@@ -16,6 +16,8 @@ class AlbumDraft {
     required this.trackFiles,
     required this.trackUrls,
     this.folderImageUrl,
+    this.bookletImages = const [],
+    this.pdfs = const [],
     this.readMeta,
   });
 
@@ -26,6 +28,8 @@ class AlbumDraft {
   final List<String> trackFiles;
   final List<String> trackUrls;
   final String? folderImageUrl;
+  final List<String> bookletImages;
+  final List<String> pdfs;
   final Future<FlacMeta?> Function()? readMeta;
 }
 
@@ -125,6 +129,8 @@ Future<Vinyl?> _build(AlbumDraft d) async {
     tracks: [for (final t in d.trackFiles) trackTitle(t, artist: artist)],
     trackUrls: d.trackUrls,
     coverUrl: cover,
+    booklet: d.bookletImages,
+    pdfs: d.pdfs,
     owned: true,
   );
 }

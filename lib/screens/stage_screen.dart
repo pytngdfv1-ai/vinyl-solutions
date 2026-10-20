@@ -7,6 +7,7 @@ import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
+import 'booklet_screen.dart';
 
 /// Disco sacado de la caja: tornamesa arriba, carátula abajo.
 /// Toca la carátula para darla vuelta (pistas), la tornamesa para play/pausa.
@@ -120,6 +121,14 @@ class _StageScreenState extends State<StageScreen> {
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
+                  if (v.hasBooklet)
+                    IconButton(
+                      tooltip: 'Libreto',
+                      icon: const Icon(Icons.menu_book),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(builder: (_) => BookletScreen(vinyl: v)),
+                      ),
+                    ),
                   IconButton(
                     icon: const Icon(Icons.info_outline),
                     onPressed: () => showModalBottomSheet<void>(

@@ -10,11 +10,12 @@ Widget buildCoverImage(
   String url, {
   required int cacheWidth,
   required Widget fallback,
+  BoxFit fit = BoxFit.cover,
 }) {
   if (url.startsWith('file:')) {
     return Image.file(
       File(Uri.parse(url).toFilePath()),
-      fit: BoxFit.cover,
+      fit: fit,
       cacheWidth: cacheWidth,
       gaplessPlayback: true,
       errorBuilder: (_, __, ___) => fallback,
@@ -23,7 +24,7 @@ Widget buildCoverImage(
   return Image.network(
     url,
     headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
-    fit: BoxFit.cover,
+    fit: fit,
     cacheWidth: cacheWidth,
     gaplessPlayback: true,
     errorBuilder: (_, __, ___) => fallback,
