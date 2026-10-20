@@ -159,7 +159,28 @@ class KoofrClient {
     if (audio.isNotEmpty) {
       // Audio suelto en la carpeta elegida, o muy pocos temas: no es un álbum.
       if (names.isEmpty || audio.length < LibrarySettings.minTracks) {
-        _skipped++;
+        // Cada tema va al baúl de temas sueltos.
+        final imgs0 = entries
+            .where((e) => !e.isDir && _imageExt.any((x) => e.name.toLowerCase().endsWith(x)))
+            .toList();
+        final pref0 = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
+        final art0 = imgs0.where((e) => pref0.hasMatch(e.name)).firstOrNull ?? imgs0.firstOrNull;
+        for (final e in audio) {
+          out.add(AlbumDraft(
+            key: '${names.join('/')}/${e.name}',
+            idPrefix: 'dav_${settings.id}_s_',
+            single: true,
+            folderArtist: names.length >= 2 ? names[names.length - 2] : null,
+            fallbackArtist: names.length == 1 ? names.first : null,
+            folderAlbum: names.isEmpty ? '' : names.last,
+            trackFiles: [e.name],
+            trackUrls: [_u(e.uri)],
+            folderImageUrl: names.isEmpty || art0 == null ? null : _u(art0.uri),
+            readMeta: e.name.toLowerCase().endsWith('.flac')
+                ? () => readFlacMeta(_reader(e.uri))
+                : null,
+          ));
+        }
       } else {
         final images = entries
             .where((e) => !e.isDir && _imageExt.any((x) => e.name.toLowerCase().endsWith(x)))

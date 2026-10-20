@@ -18,6 +18,8 @@ class AlbumDraft {
     this.folderImageUrl,
     this.bookletImages = const [],
     this.pdfs = const [],
+    this.single = false,
+    this.fallbackArtist,
     this.readMeta,
   });
 
@@ -30,6 +32,10 @@ class AlbumDraft {
   final String? folderImageUrl;
   final List<String> bookletImages;
   final List<String> pdfs;
+
+  /// Tema suelto (va al baúl de sueltos). [fallbackArtist] se usa si no hay etiquetas.
+  final bool single;
+  final String? fallbackArtist;
   final Future<FlacMeta?> Function()? readMeta;
 
   String get id => '$idPrefix${base64Url.encode(utf8.encode(key))}';
@@ -46,9 +52,13 @@ class ScanResult {
   final List<String> noCover;
 
   String summary(int minTracks) {
-    final b = StringBuffer('${albums.length} álbumes agregados.');
+    final singles = albums.where((a) => a.single).length;
+    final full = albums.length - singles;
+    final b = StringBuffer('$full álbumes');
+    if (singles > 0) b.write(' y $singles temas sueltos');
+    b.write(' agregados.');
     if (skipped > 0) {
-      b.write(' Ignoré $skipped carpetas con menos de $minTracks temas o con temas sueltos.');
+      b.write(' Ignoré $skipped elementos sin artista identificable.');
     }
     if (noCover.isNotEmpty) {
       b.write(
@@ -77,7 +87,7 @@ Future<ScanResult> buildAlbums(
       final d = drafts[i];
       onProgress?.call(d.folderAlbum);
       final old = reuse[d.id];
-      if (old != null && old.coverUrl != null && old.trackUrls.length == d.trackUrls.length) {
+      if (old != null && old.coverUrl != null && old.year > 0 && old.trackUrls.length == d.trackUrls.length) {
         // Ya estaba en la biblioteca: se conserva portada y datos, se refrescan archivos.
         built[i] = old.copyWith(
           tracks: [for (final t in d.trackFiles) trackTitle(t, artist: old.artist)],
@@ -118,8 +128,15 @@ Future<Vinyl?> _build(AlbumDraft d) async {
     m = await d.readMeta?.call();
   } catch (_) {}
 
-  final artist = d.folderArtist ?? m?.albumArtist ?? m?.artist ?? guessArtist(d.trackFiles);
-  if (artist == null || artist.trim().isEmpty) return null; // tema suelto
+  final artist = d.folderArtist ??
+      m?.albumArtist ??
+      m?.artist ??
+      guessArtist(d.trackFiles) ??
+      d.fallbackArtist;
+  if (artist == null || artist.trim().isEmpty) return null; // sin artista
+
+  final tracks = [for (final t in d.trackFiles) trackTitle(t, artist: artist)];
+  final title = d.single ? tracks.first : d.folderAlbum;
 
   var cover = d.folderImageUrl;
   final pic = m?.picture;
@@ -128,25 +145,37 @@ Future<Vinyl?> _build(AlbumDraft d) async {
       cover = await CoverCache.save(d.key, pic, m?.pictureMime);
     } catch (_) {}
   }
-  final tagAlbum = m?.album;
-  cover ??= await CoverLookup.find(
-    artist: artist,
-    albums: [if (tagAlbum != null) tagAlbum, d.folderAlbum],
-    tracks: [for (final t in d.trackFiles) trackTitle(t, artist: artist)],
-  );
+  var year = yearOf(m?.date);
+  if (year == 0 && !d.single) year = yearOf(d.folderAlbum);
 
-  final year = yearOf(m?.date);
+  // Portada en internet y/o año de lanzamiento si faltan.
+  if (cover == null || year == 0) {
+    final tagAlbum = m?.album;
+    final hit = await CoverLookup.find(
+      artist: artist,
+      albums: [
+        if (tagAlbum != null) tagAlbum,
+        if (d.folderAlbum.isNotEmpty) d.folderAlbum,
+      ],
+      tracks: tracks,
+      trackFirst: d.single,
+    );
+    cover ??= hit?.url;
+    if (year == 0) year = hit?.year ?? 0;
+  }
+
   return Vinyl(
-    id: '${d.idPrefix}${base64Url.encode(utf8.encode(d.key))}',
-    title: d.folderAlbum,
+    id: d.id,
+    title: title,
     artist: artist,
-    year: year > 0 ? year : yearOf(d.folderAlbum),
+    year: year,
     hue: (d.key.codeUnits.fold<int>(0, (s, c) => s + c) % 360).toDouble(),
-    tracks: [for (final t in d.trackFiles) trackTitle(t, artist: artist)],
+    tracks: tracks,
     trackUrls: d.trackUrls,
     coverUrl: cover,
     booklet: d.bookletImages,
     pdfs: d.pdfs,
+    single: d.single,
     owned: true,
   );
 }

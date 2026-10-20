@@ -51,12 +51,6 @@ class LocalScanner {
 
       final rel = dir.length > rootPath.length ? dir.substring(rootPath.length) : '';
       final names = rel.split('/').where((s) => s.isNotEmpty).toList();
-      // Audio suelto en la carpeta elegida, o muy pocos temas: no es un álbum.
-      if (names.isEmpty || audio.length < min) {
-        skipped++;
-        continue;
-      }
-
       final images = list.where((f) => _hasExt(f.path, _imageExt)).toList();
       final pref = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
       File? art;
@@ -67,6 +61,27 @@ class LocalScanner {
         }
       }
       art ??= images.isEmpty ? null : images.first;
+
+      // Audio suelto en la carpeta elegida o carpeta con pocos temas:
+      // cada tema va al baúl de temas sueltos.
+      if (names.isEmpty || audio.length < min) {
+        for (final f in audio) {
+          final p = f.path;
+          drafts.add(AlbumDraft(
+            key: p,
+            idPrefix: 'locs_',
+            single: true,
+            folderArtist: names.length >= 2 ? names[names.length - 2] : null,
+            fallbackArtist: names.length == 1 ? names.first : null,
+            folderAlbum: names.isEmpty ? '' : names.last,
+            trackFiles: [_base(p)],
+            trackUrls: [Uri.file(p).toString()],
+            folderImageUrl: names.isEmpty || art == null ? null : Uri.file(art.path).toString(),
+            readMeta: p.toLowerCase().endsWith('.flac') ? () => _meta(p) : null,
+          ));
+        }
+        continue;
+      }
 
       // Libreto: el resto de imágenes y PDFs de la carpeta y de sus subcarpetas
       // "Libreto", "Booklet", "Scans", "Artwork"…

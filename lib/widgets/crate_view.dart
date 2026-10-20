@@ -15,11 +15,13 @@ class CrateView extends StatefulWidget {
     required this.items,
     required this.onPick,
     this.onLongPress,
+    this.emptyText = 'Biblioteca vacía\nToca + y elige "Conectar Koofr"',
   });
 
   final List<Vinyl> items;
   final ValueChanged<Vinyl> onPick;
   final ValueChanged<Vinyl>? onLongPress;
+  final String emptyText;
 
   @override
   State<CrateView> createState() => _CrateViewState();
@@ -74,7 +76,7 @@ class _CrateViewState extends State<CrateView>
     if (items.isEmpty) {
       return const Center(
         child: Text(
-          'Biblioteca vacía\nToca + y elige "Conectar Koofr"',
+          widget.emptyText,
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white70),
         ),

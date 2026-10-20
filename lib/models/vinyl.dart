@@ -13,6 +13,7 @@ class Vinyl {
     this.pdfs = const [],
     this.genre,
     this.source,
+    this.single = false,
   });
 
   final String id;
@@ -34,6 +35,9 @@ class Vinyl {
   /// Género (el de la nube de origen) y origen: id de cuenta o 'local'.
   final String? genre;
   final String? source;
+
+  /// Tema suelto (single, recopilación) en vez de álbum completo.
+  final bool single;
 
   /// Separador generado entre artistas (no es un disco real).
   bool get isDivider => id.startsWith('sep_');
@@ -66,6 +70,7 @@ class Vinyl {
         pdfs: pdfs ?? this.pdfs,
         genre: genre ?? this.genre,
         source: source ?? this.source,
+        single: single,
       );
 
   Map<String, dynamic> toJson() => {
@@ -82,6 +87,7 @@ class Vinyl {
         'pdfs': pdfs,
         'genre': genre,
         'source': source,
+        'single': single,
       };
 
   factory Vinyl.fromJson(Map<String, dynamic> j) => Vinyl(
@@ -98,5 +104,6 @@ class Vinyl {
         pdfs: (j['pdfs'] as List?)?.cast<String>() ?? const [],
         genre: j['genre'] as String?,
         source: j['source'] as String?,
+        single: j['single'] as bool? ?? false,
       );
 }
