@@ -31,6 +31,8 @@ class AlbumDraft {
   final List<String> bookletImages;
   final List<String> pdfs;
   final Future<FlacMeta?> Function()? readMeta;
+
+  String get id => '$idPrefix${base64Url.encode(utf8.encode(key))}';
 }
 
 class ScanResult {
@@ -63,6 +65,7 @@ Future<ScanResult> buildAlbums(
   List<AlbumDraft> drafts, {
   int skippedBefore = 0,
   void Function(String)? onProgress,
+  Map<String, Vinyl> reuse = const {},
 }) async {
   final built = List<Vinyl?>.filled(drafts.length, null);
   var next = 0;
@@ -71,9 +74,22 @@ Future<ScanResult> buildAlbums(
     while (true) {
       final i = next++;
       if (i >= drafts.length) return;
-      onProgress?.call(drafts[i].folderAlbum);
+      final d = drafts[i];
+      onProgress?.call(d.folderAlbum);
+      final old = reuse[d.id];
+      if (old != null && old.coverUrl != null && old.trackUrls.length == d.trackUrls.length) {
+        // Ya estaba en la biblioteca: se conserva portada y datos, se refrescan archivos.
+        built[i] = old.copyWith(
+          tracks: [for (final t in d.trackFiles) trackTitle(t, artist: old.artist)],
+          trackUrls: d.trackUrls,
+          coverUrl: d.folderImageUrl,
+          booklet: d.bookletImages,
+          pdfs: d.pdfs,
+        );
+        continue;
+      }
       try {
-        built[i] = await _build(drafts[i]);
+        built[i] = await _build(d);
       } catch (_) {
         built[i] = null;
       }

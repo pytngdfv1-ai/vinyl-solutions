@@ -74,20 +74,24 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
-  /// Reemplaza los discos de Koofr por el resultado del último escaneo.
-  Future<void> replaceRemote(List<Vinyl> scanned) async {
+  bool _fromAccount(Vinyl v, String accountId) =>
+      v.source == accountId || (v.source == null && v.id.startsWith('dav_'));
+
+  /// Reemplaza los discos de una cuenta de Koofr por el último escaneo.
+  Future<void> replaceAccount(String accountId, List<Vinyl> scanned, {String? genre}) async {
     final owned = {for (final v in _items) v.id: v.owned};
-    final local = _items.where((v) => !v.id.startsWith('dav_')).toList();
-    final remote = [
-      for (final v in scanned) v.copyWith(owned: owned[v.id] ?? true),
+    final others = _items.where((v) => !_fromAccount(v, accountId)).toList();
+    final fresh = [
+      for (final v in scanned)
+        v.copyWith(owned: owned[v.id] ?? true, genre: genre, source: accountId),
     ];
-    _items = [...remote, ...local];
+    _items = [...fresh, ...others];
     notifyListeners();
     await _save();
   }
 
-  Future<void> clearRemote() async {
-    _items = _items.where((v) => !v.id.startsWith('dav_')).toList();
+  Future<void> removeAccount(String accountId) async {
+    _items = _items.where((v) => !_fromAccount(v, accountId)).toList();
     notifyListeners();
     await _save();
   }
@@ -97,7 +101,7 @@ class VinylStore extends ChangeNotifier {
     final ids = {for (final a in albums) a.id};
     final owned = {for (final v in _items) v.id: v.owned};
     _items = [
-      for (final a in albums) a.copyWith(owned: owned[a.id] ?? true),
+      for (final a in albums) a.copyWith(owned: owned[a.id] ?? true, source: 'local'),
       ..._items.where((v) => !ids.contains(v.id)),
     ];
     notifyListeners();

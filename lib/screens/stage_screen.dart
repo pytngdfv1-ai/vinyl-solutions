@@ -43,15 +43,17 @@ class _StageScreenState extends State<StageScreen> {
     }
     // Si este disco ya está sonando, la reproducción continúa sin tocarla.
     if (_audio.nowPlaying.value?.id == v.id) return;
+    // Si otro disco está sonando, no lo interrumpas: solo se cambia al elegir un tema.
+    if (_audio.nowPlaying.value != null && _audio.player.playing) return;
     await Future.delayed(const Duration(milliseconds: 650));
     if (!mounted) return;
     await _ensureLoaded();
   }
 
-  Future<bool> _ensureLoaded() async {
+  Future<bool> _ensureLoaded({int index = 0}) async {
     if (_audio.nowPlaying.value?.id == v.id) return true;
     try {
-      await _audio.start(v);
+      await _audio.start(v, index: index);
       return _audio.nowPlaying.value?.id == v.id;
     } catch (e) {
       if (mounted) setState(() => _error = 'No se pudo reproducir: $e');
@@ -99,7 +101,11 @@ class _StageScreenState extends State<StageScreen> {
   }
 
   Future<void> _playTrack(int i) async {
-    if (await _ensureLoaded()) await _audio.goTrack(i);
+    if (_audio.nowPlaying.value?.id == v.id) {
+      await _audio.goTrack(i);
+    } else {
+      await _ensureLoaded(index: i); // carga el disco directamente en ese tema
+    }
   }
 
   void _prev() => _audio.goTrack((_audio.player.currentIndex ?? 0) - 1);
@@ -177,6 +183,18 @@ class _StageScreenState extends State<StageScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
               ),
+            ValueListenableBuilder<Vinyl?>(
+              valueListenable: _audio.nowPlaying,
+              builder: (_, np, __) => np != null && np.id != v.id && v.hasAudio
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Sigue sonando: ${np.title}. Toca un tema o play para cambiar.',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             _Controls(
               vinyl: v,
               audio: _audio,

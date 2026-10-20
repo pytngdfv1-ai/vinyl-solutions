@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/koofr_settings.dart';
 import 'data/library_settings.dart';
+import 'data/library_sync.dart';
 import 'data/vinyl_store.dart';
 import 'screens/crate_screen.dart';
 
@@ -10,9 +11,10 @@ Future<void> main() async {
   final store = VinylStore();
   await store.load();
   await LibrarySettings.load();
-  final koofr = await KoofrSettings.load();
-  if (koofr != null) KoofrSettings.activeHeaders = koofr.headers;
+  await KoofrAccounts.load();
   runApp(VinylApp(store: store));
+  // Sincroniza las nubes al abrir (en segundo plano).
+  LibrarySync.syncAll(store);
 }
 
 class VinylApp extends StatelessWidget {
