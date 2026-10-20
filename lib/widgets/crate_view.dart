@@ -74,7 +74,7 @@ class _CrateViewState extends State<CrateView>
   Widget build(BuildContext context) {
     final items = widget.items;
     if (items.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           widget.emptyText,
           textAlign: TextAlign.center,
