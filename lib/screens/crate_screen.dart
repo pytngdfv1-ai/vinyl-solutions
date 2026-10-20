@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../audio/player_service.dart';
 import '../data/library_settings.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
