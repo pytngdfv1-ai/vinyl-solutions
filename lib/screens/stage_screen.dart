@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 
 import '../audio/player_service.dart';
 import '../data/vinyl_store.dart';
@@ -37,114 +35,74 @@ class _StageScreenState extends State<StageScreen> {
   }
 
   Future<void> _start() async {
-    await Future.delayed(const Duration(milliseconds: 650));
-    if (!mounted) return;
     if (!v.hasAudio) {
-      setState(() => _simPlaying = true);
+      await Future.delayed(const Duration(milliseconds: 650));
+      if (mounted) setState(() => _simPlaying = true);
       return;
     }
+    // Si este disco ya está sonando, la reproducción continúa sin tocarla.
+    if (_audio.nowPlaying.value?.id == v.id) return;
+    await Future.delayed(const Duration(milliseconds: 650));
+    if (!mounted) return;
+    await _ensureLoaded();
+  }
+
+  Future<bool> _ensureLoaded() async {
+    if (_audio.nowPlaying.value?.id == v.id) return true;
     try {
-      await _audio.load(v);
-      _lastIndex = _audio.player.currentIndex ?? 0;
-      _subs.add(_audio.player.currentIndexStream.listen(_onIndex));
-      _subs.add(_audio.player.processingStateStream.listen((st) {
-        if (st == ProcessingState.completed) _onCompleted();
-      }));
-      _audio.player.play();
+      await _audio.start(v);
+      return _audio.nowPlaying.value?.id == v.id;
     } catch (e) {
       if (mounted) setState(() => _error = 'No se pudo reproducir: $e');
+      return false;
     }
   }
 
-  @override
-  void dispose() {
-    for (final s in _subs) {
-      s.cancel();
-    }
-    if (v.hasAudio) _audio.stop();
-    super.dispose();
-  }
-
-  final List<StreamSubscription<Object?>> _subs = [];
-  int? _lastIndex;
-  bool _changing = false;
-
-  /// Cambio manual: el brazo vuelve al reposo, cambia el tema y baja de nuevo.
-  Future<void> _goTrack(int i) async {
-    if (!v.hasAudio || _changing || i < 0 || i >= v.tracks.length) return;
-    _changing = true;
-    final p = _audio.player;
-    await p.pause(); // el brazo se levanta
-    await Future.delayed(const Duration(milliseconds: 900));
-    _lastIndex = i;
-    await p.seek(Duration.zero, index: i);
-    await Future.delayed(const Duration(milliseconds: 300));
-    _changing = false;
-    if (mounted) p.play(); // el brazo baja al borde exterior
-  }
-
-  /// El reproductor pasó solo al siguiente tema: repite la animación.
-  void _onIndex(int? i) {
-    if (i == null) return;
-    final prev = _lastIndex;
-    _lastIndex = i;
-    if (prev == null || prev == i || _changing) return;
-    _autoAdvance();
-  }
-
-  Future<void> _autoAdvance() async {
-    _changing = true;
-    final p = _audio.player;
-    await p.pause();
-    await Future.delayed(const Duration(milliseconds: 900));
-    await p.seek(Duration.zero);
-    await Future.delayed(const Duration(milliseconds: 300));
-    _changing = false;
-    if (mounted) p.play();
-  }
-
-  /// Terminó el último tema: el brazo vuelve al reposo.
-  Future<void> _onCompleted() async {
-    if (_changing) return;
-    _changing = true;
-    final p = _audio.player;
-    await p.pause();
-    _lastIndex = 0;
-    await p.seek(Duration.zero, index: 0);
-    _changing = false;
-  }
+  // La música NO se detiene al cerrar esta pantalla.
 
   Widget _turntable() {
     if (!v.hasAudio) return Turntable(vinyl: v, playing: _simPlaying, progress: 0);
     final p = _audio.player;
-    return StreamBuilder<bool>(
-      stream: p.playingStream,
-      initialData: false,
-      builder: (_, ps) => StreamBuilder<Duration>(
-        stream: p.positionStream,
-        builder: (_, pos) {
-          final dur = p.duration?.inMilliseconds ?? 0;
-          final cur = (pos.data ?? Duration.zero).inMilliseconds;
-          final prog = dur > 0 ? (cur / dur).clamp(0.0, 1.0).toDouble() : 0.0;
-          return Turntable(vinyl: v, playing: ps.data ?? false, progress: prog);
-        },
-      ),
+    return ValueListenableBuilder<Vinyl?>(
+      valueListenable: _audio.nowPlaying,
+      builder: (_, np, __) {
+        if (np?.id != v.id) return Turntable(vinyl: v, playing: false, progress: 0);
+        return StreamBuilder<bool>(
+          stream: p.playingStream,
+          initialData: p.playing,
+          builder: (_, ps) => StreamBuilder<Duration>(
+            stream: p.positionStream,
+            builder: (_, pos) {
+              final dur = p.duration?.inMilliseconds ?? 0;
+              final cur = (pos.data ?? Duration.zero).inMilliseconds;
+              final prog = dur > 0 ? (cur / dur).clamp(0.0, 1.0).toDouble() : 0.0;
+              return Turntable(vinyl: v, playing: ps.data ?? false, progress: prog);
+            },
+          ),
+        );
+      },
     );
   }
 
-  void _toggle() {
+  Future<void> _toggle() async {
     if (!v.hasAudio) {
       setState(() => _simPlaying = !_simPlaying);
+      return;
+    }
+    if (_audio.nowPlaying.value?.id != v.id) {
+      await _ensureLoaded();
       return;
     }
     final p = _audio.player;
     p.playing ? p.pause() : p.play();
   }
 
-  Future<void> _playTrack(int i) => _goTrack(i);
+  Future<void> _playTrack(int i) async {
+    if (await _ensureLoaded()) await _audio.goTrack(i);
+  }
 
-  void _prev() => _goTrack((_audio.player.currentIndex ?? 0) - 1);
-  void _next() => _goTrack((_audio.player.currentIndex ?? 0) + 1);
+  void _prev() => _audio.goTrack((_audio.player.currentIndex ?? 0) - 1);
+  void _next() => _audio.goTrack((_audio.player.currentIndex ?? 0) + 1);
 
   @override
   Widget build(BuildContext context) {
@@ -246,66 +204,74 @@ class _Controls extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = audio.player;
     final v = vinyl;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Column(
-        children: [
-          if (v.hasAudio)
-            StreamBuilder<Duration>(
-              stream: p.positionStream,
-              builder: (_, s) {
-                final dur = p.duration ?? Duration.zero;
-                final maxMs = dur.inMilliseconds.toDouble();
-                final pos = (s.data ?? Duration.zero).inMilliseconds.toDouble();
-                return Slider(
-                  value: maxMs > 0 ? pos.clamp(0.0, maxMs).toDouble() : 0,
-                  max: maxMs > 0 ? maxMs : 1,
-                  onChanged: (x) => p.seek(Duration(milliseconds: x.round())),
-                );
-              },
-            ),
-          Row(
+    return ValueListenableBuilder<Vinyl?>(
+      valueListenable: audio.nowPlaying,
+      builder: (context, np, _) {
+        final active = np?.id == v.id;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+          child: Column(
             children: [
-              Expanded(
-                child: v.hasAudio
-                    ? StreamBuilder<int?>(
-                        stream: p.currentIndexStream,
+              if (v.hasAudio)
+                active
+                    ? StreamBuilder<Duration>(
+                        stream: p.positionStream,
                         builder: (_, s) {
-                          final i = s.data ?? 0;
-                          final t = i < v.tracks.length ? v.tracks[i] : v.title;
-                          return _Info(title: t, sub: '${v.artist} · ${v.title}');
+                          final dur = p.duration ?? Duration.zero;
+                          final maxMs = dur.inMilliseconds.toDouble();
+                          final pos = (s.data ?? Duration.zero).inMilliseconds.toDouble();
+                          return Slider(
+                            value: maxMs > 0 ? pos.clamp(0.0, maxMs).toDouble() : 0,
+                            max: maxMs > 0 ? maxMs : 1,
+                            onChanged: (x) => p.seek(Duration(milliseconds: x.round())),
+                          );
                         },
                       )
-                    : _Info(title: v.title, sub: '${v.artist}  ${v.yearLabel}'),
-              ),
-              if (v.hasAudio) ...[
-                IconButton(
-                  icon: const Icon(Icons.skip_previous),
-                  onPressed: onPrev,
-                ),
-                StreamBuilder<bool>(
-                  stream: p.playingStream,
-                  initialData: false,
-                  builder: (_, s) => IconButton.filled(
-                    iconSize: 30,
-                    icon: Icon((s.data ?? false) ? Icons.pause : Icons.play_arrow),
-                    onPressed: onToggle,
+                    : const Slider(value: 0, onChanged: null),
+              Row(
+                children: [
+                  Expanded(
+                    child: v.hasAudio && active
+                        ? StreamBuilder<int?>(
+                            stream: p.currentIndexStream,
+                            builder: (_, s) {
+                              final i = s.data ?? 0;
+                              final t = i < v.tracks.length ? v.tracks[i] : v.title;
+                              return _Info(title: t, sub: '${v.artist} · ${v.title}');
+                            },
+                          )
+                        : _Info(title: v.title, sub: '${v.artist}  ${v.yearLabel}'),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.skip_next),
-                  onPressed: onNext,
-                ),
-              ] else
-                IconButton.filled(
-                  iconSize: 30,
-                  icon: Icon(simPlaying ? Icons.pause : Icons.play_arrow),
-                  onPressed: onToggle,
-                ),
+                  if (v.hasAudio) ...[
+                    IconButton(
+                      icon: const Icon(Icons.skip_previous),
+                      onPressed: active ? onPrev : null,
+                    ),
+                    StreamBuilder<bool>(
+                      stream: p.playingStream,
+                      initialData: p.playing,
+                      builder: (_, s) => IconButton.filled(
+                        iconSize: 30,
+                        icon: Icon(active && (s.data ?? false) ? Icons.pause : Icons.play_arrow),
+                        onPressed: onToggle,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.skip_next),
+                      onPressed: active ? onNext : null,
+                    ),
+                  ] else
+                    IconButton.filled(
+                      iconSize: 30,
+                      icon: Icon(simPlaying ? Icons.pause : Icons.play_arrow),
+                      onPressed: onToggle,
+                    ),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -460,6 +426,7 @@ class DetailSheet extends StatelessWidget {
                         icon: const Icon(Icons.delete_outline),
                         label: const Text('Eliminar'),
                         onPressed: () {
+                          PlayerService.instance.stopIf(v.id);
                           store.remove(v.id);
                           Navigator.of(context)
                             ..pop()
