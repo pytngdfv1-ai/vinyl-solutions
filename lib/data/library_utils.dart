@@ -36,3 +36,23 @@ int yearOf(String? s) {
   final m = RegExp(r'(19|20)\d{2}').firstMatch(s);
   return m == null ? 0 : int.parse(m.group(0)!);
 }
+
+/// Orden "natural": 2 antes que 10.
+int naturalCompare(String a, String b) {
+  final re = RegExp(r'\d+|\D+');
+  final x = re.allMatches(a.toLowerCase()).map((m) => m[0]!).toList();
+  final y = re.allMatches(b.toLowerCase()).map((m) => m[0]!).toList();
+  for (var i = 0; i < x.length && i < y.length; i++) {
+    final nx = int.tryParse(x[i]);
+    final ny = int.tryParse(y[i]);
+    final c = (nx != null && ny != null) ? nx.compareTo(ny) : x[i].compareTo(y[i]);
+    if (c != 0) return c;
+  }
+  return x.length.compareTo(y.length);
+}
+
+/// ¿Es una subcarpeta de libreto/extras de un álbum?
+bool isBookletDir(String name) => RegExp(
+      r'libreto|booklet|scans?|artwork|extras?|inlay|insert|book',
+      caseSensitive: false,
+    ).hasMatch(name);
