@@ -4,7 +4,7 @@ import 'data/koofr_settings.dart';
 import 'data/library_settings.dart';
 import 'data/library_sync.dart';
 import 'data/vinyl_store.dart';
-import 'screens/crate_screen.dart';
+import 'screens/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +32,7 @@ class VinylApp extends StatelessWidget {
         brightness: Brightness.dark,
         colorSchemeSeed: const Color(0xFFE53935),
       ),
-      home: CrateScreen(store: store),
+      home: HomeScreen(store: store),
     );
   }
 }
