@@ -28,7 +28,21 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log || true
 
       - name: Build APK
+        shell: bash
         run: flutter build apk --release 2>&1 | tee build.log
+
+      - name: Show errors
+        if: failure()
+        shell: bash
+        run: |
+          for f in analyze.log build.log; do
+            [ -f "$f" ] || continue
+            msg=$(grep -E " error •|Error|error:|FAILURE|What went wrong|Could not|e: |not found|Exception" "$f" | head -40 || true)
+            [ -n "$msg" ] || msg=$(tail -n 30 "$f")
+            msg="${msg//'%'/'%25'}"
+            msg="${msg//$'\n'/'%0A'}"
+            echo "::error title=$f::$msg"
+          done
 
       - uses: actions/upload-artifact@v4
         if: always()
