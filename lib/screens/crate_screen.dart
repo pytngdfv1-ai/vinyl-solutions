@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
+import '../widgets/cover_art.dart';
 import '../widgets/crate_view.dart';
 import 'koofr_screen.dart';
 import 'local_screen.dart';
@@ -51,7 +52,10 @@ class _CrateScreenState extends State<CrateScreen> {
         ],
       ),
     );
-    if (ok == true) await widget.store.remove(v.id);
+    if (ok == true) {
+      await PlayerService.instance.stopIf(v.id);
+      await widget.store.remove(v.id);
+    }
   }
 
   Future<void> _confirmClear() async {
@@ -74,7 +78,10 @@ class _CrateScreenState extends State<CrateScreen> {
         ],
       ),
     );
-    if (ok == true) await widget.store.clearAll();
+    if (ok == true) {
+      await PlayerService.instance.stop();
+      await widget.store.clearAll();
+    }
   }
 
   void _openLocal() {
@@ -213,6 +220,17 @@ class _CrateScreenState extends State<CrateScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _NowPlaying(
+                            onOpen: (v) => _open(
+                              widget.store.items.firstWhere((e) => e.id == v.id, orElse: () => v),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -256,6 +274,66 @@ class _CrateScreenState extends State<CrateScreen> {
                 ),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Mini reproductor: muestra lo que suena mientras buscas otro disco.
+class _NowPlaying extends StatelessWidget {
+  const _NowPlaying({required this.onOpen});
+
+  final ValueChanged<Vinyl> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final audio = PlayerService.instance;
+    final p = audio.player;
+    return ValueListenableBuilder<Vinyl?>(
+      valueListenable: audio.nowPlaying,
+      builder: (_, v, __) {
+        if (v == null) return const SizedBox.shrink();
+        return Material(
+          color: const Color(0xDD1E1E1E),
+          borderRadius: BorderRadius.circular(24),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () => onOpen(v),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(5, 4, 2, 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(width: 32, height: 32, child: ClipOval(child: CoverArt(vinyl: v, radius: 0))),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: StreamBuilder<int?>(
+                      stream: p.currentIndexStream,
+                      builder: (_, s) {
+                        final i = s.data ?? 0;
+                        return Text(
+                          i < v.tracks.length ? v.tracks[i] : v.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        );
+                      },
+                    ),
+                  ),
+                  StreamBuilder<bool>(
+                    stream: p.playingStream,
+                    initialData: p.playing,
+                    builder: (_, s) => IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon((s.data ?? false) ? Icons.pause : Icons.play_arrow),
+                      onPressed: () => (s.data ?? false) ? p.pause() : p.play(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
