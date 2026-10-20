@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../audio/player_service.dart';
+import '../data/koofr_settings.dart';
+import '../data/library_order.dart';
 import '../data/library_settings.dart';
+import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/cover_art.dart';
@@ -24,8 +27,11 @@ class CrateScreen extends StatefulWidget {
 class _CrateScreenState extends State<CrateScreen> {
   _Filter _filter = _Filter.all;
   bool _menuOpen = false;
+  String? _genre;
+  String? _source;
 
   void _open(Vinyl v) {
+    if (v.isDivider) return;
     Navigator.of(context).push(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 450),
@@ -37,6 +43,7 @@ class _CrateScreenState extends State<CrateScreen> {
   }
 
   Future<void> _confirmDelete(Vinyl v) async {
+    if (v.isDivider) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -156,22 +163,92 @@ class _CrateScreenState extends State<CrateScreen> {
     }
   }
 
+  String _sourceName(String id) {
+    if (id == 'local') return 'Teléfono';
+    for (final a in KoofrAccounts.list) {
+      if (a.id == id) return a.name;
+    }
+    return 'Nube';
+  }
+
+  String _chipLabel() {
+    final base = _filter == _Filter.owned ? 'Mi colección' : 'Catálogo';
+    if (_genre != null) return '$base · $_genre';
+    if (_source != null) return '$base · ${_sourceName(_source!)}';
+    return base;
+  }
+
+  /// Filtros por género y por nube/teléfono.
+  List<Widget> _filterTiles(List<Vinyl> all) {
+    final genres = <String>{
+      for (final v in all)
+        if ((v.genre ?? '').isNotEmpty) v.genre!,
+    }.toList()
+      ..sort();
+    final sources = <String>{
+      for (final v in all)
+        if (v.source != null) v.source!,
+    }.toList()
+      ..sort();
+    void pick(String? g, String? s) {
+      setState(() {
+        _genre = g;
+        _source = s;
+      });
+      Navigator.of(context).pop();
+    }
+
+    return [
+      if (genres.isNotEmpty || sources.length > 1)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, 2),
+          child: Text('FILTRAR', style: TextStyle(color: Colors.white54, fontSize: 12)),
+        ),
+      if (_genre != null || _source != null)
+        ListTile(
+          dense: true,
+          leading: const Icon(Icons.clear_all),
+          title: const Text('Quitar filtros'),
+          onTap: () => pick(null, null),
+        ),
+      for (final g in genres)
+        ListTile(
+          dense: true,
+          leading: const Icon(Icons.label_outline),
+          title: Text('Género: $g'),
+          trailing: _genre == g ? const Icon(Icons.check) : null,
+          onTap: () => pick(g, null),
+        ),
+      if (sources.length > 1)
+        for (final s in sources)
+          ListTile(
+            dense: true,
+            leading: Icon(s == 'local' ? Icons.smartphone : Icons.cloud_outlined),
+            title: Text(s == 'local' ? 'Teléfono' : 'Nube: ${_sourceName(s)}'),
+            trailing: _source == s ? const Icon(Icons.check) : null,
+            onTap: () => pick(null, s),
+          ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.store,
       builder: (context, _) {
         final all = widget.store.items;
-        final items =
+        var filtered =
             _filter == _Filter.owned ? all.where((e) => e.owned).toList() : all;
+        if (_genre != null) filtered = filtered.where((e) => e.genre == _genre).toList();
+        if (_source != null) filtered = filtered.where((e) => e.source == _source).toList();
+        final items = arrange(filtered);
 
         return Scaffold(
           backgroundColor: Colors.black,
           drawer: Drawer(
             backgroundColor: const Color(0xFF161816),
             child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: ListView(
                 children: [
                   const Padding(
                     padding: EdgeInsets.all(20),
@@ -198,6 +275,7 @@ class _CrateScreenState extends State<CrateScreen> {
                       Navigator.of(context).pop();
                     },
                   ),
+                  ..._filterTiles(all),
                   ListTile(
                     leading: const Icon(Icons.tune),
                     title: const Text('Ajustes de biblioteca'),
@@ -239,7 +317,7 @@ class _CrateScreenState extends State<CrateScreen> {
             children: [
               Positioned.fill(
                 child: CrateView(
-                  key: ValueKey(_filter),
+                  key: ValueKey('$_filter|$_genre|$_source'),
                   items: items,
                   onPick: _open,
                   onLongPress: _confirmDelete,
@@ -267,7 +345,7 @@ class _CrateScreenState extends State<CrateScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          _filter == _Filter.owned ? 'Mi colección' : 'Catálogo',
+                          _chipLabel(),
                           style: const TextStyle(
                             color: Color(0xFF5CFF7A),
                             fontWeight: FontWeight.w700,
@@ -289,6 +367,19 @@ class _CrateScreenState extends State<CrateScreen> {
                   ),
                 ),
               ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<String?>(
+                    valueListenable: LibrarySync.busy,
+                    builder: (_, m, __) => m == null
+                        ? const SizedBox.shrink()
+                        : const LinearProgressIndicator(minHeight: 2),
+                  ),
+                ),
               ),
               Positioned(
                 right: 16,

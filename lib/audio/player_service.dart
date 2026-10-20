@@ -29,7 +29,7 @@ class PlayerService {
   bool _loading = false;
 
   /// Carga el disco y empieza a sonar. Si ya está cargado, no hace nada.
-  Future<void> start(Vinyl v) async {
+  Future<void> start(Vinyl v, {int index = 0}) async {
     if (_loadedId == v.id || _loading) return;
     _loading = true;
     try {
@@ -41,12 +41,12 @@ class PlayerService {
           for (final url in v.trackUrls)
             url.startsWith('file:')
                 ? AudioSource.uri(Uri.parse(url))
-                : LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.activeHeaders),
+                : LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.headersFor(url)),
         ],
       );
       _changing = false;
-      _lastIndex = 0;
-      await player.setAudioSource(source, initialIndex: 0);
+      _lastIndex = index;
+      await player.setAudioSource(source, initialIndex: index);
       _loadedId = v.id;
       nowPlaying.value = v;
       unawaited(player.play());
@@ -60,7 +60,7 @@ class PlayerService {
     final client = http.Client();
     try {
       final req = http.Request('GET', Uri.parse(url))
-        ..headers.addAll({...KoofrSettings.activeHeaders, 'Range': 'bytes=0-1'});
+        ..headers.addAll({...(KoofrSettings.headersFor(url) ?? const {}), 'Range': 'bytes=0-1'});
       final res = await client.send(req).timeout(const Duration(seconds: 20));
       await res.stream.listen((_) {}).cancel();
       if (res.statusCode != 200 && res.statusCode != 206) {

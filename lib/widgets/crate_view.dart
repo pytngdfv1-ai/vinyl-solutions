@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../models/vinyl.dart';
 import 'cover_art.dart';
+import 'separator_card.dart';
 
 /// Caja de discos en perspectiva: arrastra vertical para hojear,
 /// toca el disco del frente para sacarlo.
@@ -134,7 +135,7 @@ class _CrateViewState extends State<CrateView>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        current.title,
+                        current.isDivider ? current.title.toUpperCase() : current.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -144,7 +145,9 @@ class _CrateViewState extends State<CrateView>
                         ),
                       ),
                       Text(
-                        '${current.artist}${current.year > 0 ? ' · ${current.year}' : ''}   ${front + 1}/$n',
+                        current.isDivider
+                            ? 'Siguiente grupo   ${front + 1}/$n'
+                            : '${current.artist}${current.year > 0 ? ' · ${current.year}' : ''}   ${front + 1}/$n',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Colors.white70, fontSize: 12),
@@ -161,8 +164,8 @@ class _CrateViewState extends State<CrateView>
   }
 
   Widget _card(Vinyl v, double d, double c, double frontTop, double cx, bool isFront) {
-    Widget cover = CoverArt(vinyl: v);
-    if (isFront) cover = Hero(tag: 'cover-${v.id}', child: cover);
+    Widget cover = v.isDivider ? SeparatorCard(label: v.title) : CoverArt(vinyl: v);
+    if (isFront && !v.isDivider) cover = Hero(tag: 'cover-${v.id}', child: cover);
 
     if (d >= 0) {
       final k = math.pow(0.955, d).toDouble();

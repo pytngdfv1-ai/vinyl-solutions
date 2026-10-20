@@ -11,6 +11,8 @@ class Vinyl {
     this.coverUrl,
     this.booklet = const [],
     this.pdfs = const [],
+    this.genre,
+    this.source,
   });
 
   final String id;
@@ -29,22 +31,41 @@ class Vinyl {
   final List<String> booklet;
   final List<String> pdfs;
 
+  /// Género (el de la nube de origen) y origen: id de cuenta o 'local'.
+  final String? genre;
+  final String? source;
+
+  /// Separador generado entre artistas (no es un disco real).
+  bool get isDivider => id.startsWith('sep_');
+
   bool get hasBooklet => booklet.isNotEmpty || pdfs.isNotEmpty;
   bool get hasAudio => trackUrls.isNotEmpty;
   String get yearLabel => year > 0 ? '$year' : '';
 
-  Vinyl copyWith({bool? owned}) => Vinyl(
+  Vinyl copyWith({
+    bool? owned,
+    String? genre,
+    String? source,
+    List<String>? tracks,
+    List<String>? trackUrls,
+    String? coverUrl,
+    List<String>? booklet,
+    List<String>? pdfs,
+  }) =>
+      Vinyl(
         id: id,
         title: title,
         artist: artist,
         year: year,
         hue: hue,
-        tracks: tracks,
+        tracks: tracks ?? this.tracks,
         owned: owned ?? this.owned,
-        trackUrls: trackUrls,
-        coverUrl: coverUrl,
-        booklet: booklet,
-        pdfs: pdfs,
+        trackUrls: trackUrls ?? this.trackUrls,
+        coverUrl: coverUrl ?? this.coverUrl,
+        booklet: booklet ?? this.booklet,
+        pdfs: pdfs ?? this.pdfs,
+        genre: genre ?? this.genre,
+        source: source ?? this.source,
       );
 
   Map<String, dynamic> toJson() => {
@@ -59,6 +80,8 @@ class Vinyl {
         'coverUrl': coverUrl,
         'booklet': booklet,
         'pdfs': pdfs,
+        'genre': genre,
+        'source': source,
       };
 
   factory Vinyl.fromJson(Map<String, dynamic> j) => Vinyl(
@@ -73,5 +96,7 @@ class Vinyl {
         coverUrl: j['coverUrl'] as String?,
         booklet: (j['booklet'] as List?)?.cast<String>() ?? const [],
         pdfs: (j['pdfs'] as List?)?.cast<String>() ?? const [],
+        genre: j['genre'] as String?,
+        source: j['source'] as String?,
       );
 }

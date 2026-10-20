@@ -13,7 +13,7 @@ Future<Uint8List> fetchBytes(String url) async {
   final res = await http
       .get(
         Uri.parse(url),
-        headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : const {},
+        headers: KoofrSettings.headersFor(url) ?? const {},
       )
       .timeout(const Duration(seconds: 90));
   if (res.statusCode != 200) throw Exception('Error ${res.statusCode}');

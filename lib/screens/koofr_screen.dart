@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../data/koofr_client.dart';
-import '../data/library_settings.dart';
 import '../data/koofr_settings.dart';
+import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
+import 'koofr_account_screen.dart';
 
-/// Conecta Koofr (WebDAV) y arma la biblioteca con los FLAC de la nube.
+/// Lista de nubes (cuentas de Koofr). Todas forman una sola biblioteca.
 class KoofrScreen extends StatefulWidget {
   const KoofrScreen({super.key, required this.store});
 
@@ -16,143 +16,102 @@ class KoofrScreen extends StatefulWidget {
 }
 
 class _KoofrScreenState extends State<KoofrScreen> {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  final _folder = TextEditingController(text: 'Música');
   bool _busy = false;
-  bool _connected = false;
   String _status = '';
 
-  @override
-  void initState() {
-    super.initState();
-    KoofrSettings.load().then((s) {
-      if (s == null || !mounted) return;
-      setState(() {
-        _email.text = s.email;
-        _folder.text = s.folder;
-        _connected = true;
-        _status = 'Conectado. Contraseña guardada.';
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    _folder.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sync() async {
-    var password = _password.text.trim();
-    if (password.isEmpty && _connected) {
-      password = (await KoofrSettings.load())?.password ?? '';
-    }
-    final email = _email.text.trim();
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _status = 'Escribe tu correo y la contraseña de aplicación.');
-      return;
-    }
-    final s = KoofrSettings(
-      email: email,
-      password: password,
-      folder: _folder.text.trim().isEmpty ? 'Música' : _folder.text.trim(),
+  Future<void> _open([KoofrSettings? a]) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => KoofrAccountScreen(store: widget.store, account: a),
+      ),
     );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _syncAll() async {
     setState(() {
       _busy = true;
-      _status = 'Conectando…';
+      _status = 'Sincronizando…';
     });
-    try {
-      final client = KoofrClient(s);
-      final result = await client.scan(
-        onProgress: (name) {
-          if (mounted) setState(() => _status = 'Leyendo $name…');
-        },
-      );
-      await s.save();
-      await widget.store.replaceRemote(result.albums);
-      if (!mounted) return;
-      setState(() {
-        _connected = true;
-        _password.clear();
-        _status = result.albums.isEmpty
-            ? 'Conectado, pero no encontré álbumes completos. ${client.diagnostic}\n'
-                '${result.summary(LibrarySettings.minTracks)}'
-            : result.summary(LibrarySettings.minTracks);
-      });
-    } on KoofrException catch (e) {
-      if (mounted) setState(() => _status = e.message);
-    } catch (e) {
-      if (mounted) setState(() => _status = 'No se pudo conectar: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    final lines = <String>[];
+    for (final a in List.of(KoofrAccounts.list)) {
+      if (mounted) setState(() => _status = 'Sincronizando ${a.name}…');
+      try {
+        final r = await LibrarySync.syncAccount(a, widget.store);
+        lines.add('${a.name}: ${r.split('\n').first}');
+      } catch (e) {
+        lines.add('${a.name}: $e');
+      }
     }
-  }
-
-  Future<void> _disconnect() async {
-    await KoofrSettings.clear();
-    await widget.store.clearRemote();
     if (!mounted) return;
     setState(() {
-      _connected = false;
-      _email.clear();
-      _password.clear();
-      _status = 'Desconectado.';
+      _busy = false;
+      _status = lines.join('\n');
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final accounts = KoofrAccounts.list;
     return Scaffold(
-      appBar: AppBar(title: const Text('Conectar Koofr')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const Text(
-            'Estructura en Koofr:\nMúsica / Artista / Álbum / 01 - Pista.flac\n'
-            'Agrega cover.jpg en la carpeta del álbum para la carátula.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _email,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Correo de Koofr'),
-          ),
-          TextField(
-            controller: _password,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: 'Contraseña de aplicación',
-              helperText: _connected ? 'Déjala vacía para usar la guardada' : null,
+      appBar: AppBar(title: const Text('Nubes (Koofr)')),
+      body: AnimatedBuilder(
+        animation: widget.store,
+        builder: (context, _) => ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const Text(
+              'Agrega las cuentas que quieras. Todas se unen en una sola biblioteca '
+              'y se sincronizan al abrir la app. Ponle un género a cada nube para filtrar.\n'
+              'Estructura: Música / Artista / Álbum / 01 - Pista.flac',
+              style: TextStyle(color: Colors.white70),
             ),
-          ),
-          TextField(
-            controller: _folder,
-            decoration: const InputDecoration(labelText: 'Carpeta de música'),
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            icon: _busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
-            label: Text(_connected ? 'Sincronizar' : 'Guardar y sincronizar'),
-            onPressed: _busy ? null : _sync,
-          ),
-          if (_connected)
-            TextButton(
-              onPressed: _busy ? null : _disconnect,
-              child: const Text('Desconectar'),
+            const SizedBox(height: 12),
+            if (accounts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('Aún no hay cuentas.'),
+              ),
+            for (final a in accounts)
+              Card(
+                color: const Color(0xFF1B1D1B),
+                child: ListTile(
+                  leading: const Icon(Icons.cloud_outlined),
+                  title: Text(a.genre.isEmpty ? a.name : '${a.name} · ${a.genre}'),
+                  subtitle: Text(
+                    '${a.email}\n'
+                    '${widget.store.items.where((v) => v.source == a.id).length} álbumes',
+                  ),
+                  isThreeLine: true,
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _open(a),
+                ),
+              ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Agregar cuenta'),
+              onPressed: _busy ? null : () => _open(),
             ),
-          const SizedBox(height: 12),
-          Text(_status),
-        ],
+            if (accounts.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OutlinedButton.icon(
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sync),
+                  label: const Text('Sincronizar todas'),
+                  onPressed: _busy ? null : _syncAll,
+                ),
+              ),
+            const SizedBox(height: 12),
+            Text(_status),
+          ],
+        ),
       ),
     );
   }

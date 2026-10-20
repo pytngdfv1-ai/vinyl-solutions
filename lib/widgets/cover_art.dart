@@ -23,7 +23,7 @@ Widget buildCoverImage(
   }
   return Image.network(
     url,
-    headers: KoofrSettings.isKoofrUrl(url) ? KoofrSettings.activeHeaders : null,
+    headers: KoofrSettings.headersFor(url),
     fit: fit,
     cacheWidth: cacheWidth,
     gaplessPlayback: true,

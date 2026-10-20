@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
+import '../models/vinyl.dart';
 import 'album_builder.dart';
 import 'flac_meta.dart';
 import 'library_settings.dart';
@@ -95,7 +96,15 @@ class KoofrClient {
     return out;
   }
 
-  Future<ScanResult> scan({void Function(String)? onProgress}) async {
+  String _u(Uri u) => KoofrSettings.tag(u.toString(), settings.id);
+
+  Map<String, Vinyl> _reuse = const {};
+
+  Future<ScanResult> scan({
+    void Function(String)? onProgress,
+    Map<String, Vinyl> reuse = const {},
+  }) async {
+    _reuse = reuse;
     _dirs = 0;
     _filesSeen = 0;
     _skipped = 0;
@@ -107,7 +116,7 @@ class KoofrClient {
     final drafts = <AlbumDraft>[];
     await _walk(_musicDir(), top, <String>[], drafts, onProgress);
 
-    final result = await buildAlbums(drafts, skippedBefore: _skipped, onProgress: onProgress);
+    final result = await buildAlbums(drafts, skippedBefore: _skipped, onProgress: onProgress, reuse: _reuse);
     diagnostic = 'En "${settings.folder}" vi $topDirs carpetas y $topFiles archivos'
         '${sample.isEmpty ? '' : ' (ej.: $sample)'}. '
         'Revisé $_dirs carpetas y $_filesSeen archivos en total.';
@@ -178,14 +187,14 @@ class KoofrClient {
         final first = audio.first;
         out.add(AlbumDraft(
           key: names.join('/'),
-          idPrefix: 'dav_',
+          idPrefix: 'dav_${settings.id}_',
           folderArtist: names.length >= 2 ? names[names.length - 2] : null,
           folderAlbum: names.last,
           trackFiles: [for (final t in audio) t.name],
-          trackUrls: [for (final t in audio) t.uri.toString()],
-          folderImageUrl: art?.uri.toString(),
-          bookletImages: [for (final e in imgs) e.uri.toString()],
-          pdfs: [for (final e in pdfs) e.uri.toString()],
+          trackUrls: [for (final t in audio) _u(t.uri)],
+          folderImageUrl: art == null ? null : _u(art.uri),
+          bookletImages: [for (final e in imgs) _u(e.uri)],
+          pdfs: [for (final e in pdfs) _u(e.uri)],
           readMeta: first.name.toLowerCase().endsWith('.flac')
               ? () => readFlacMeta(_reader(first.uri))
               : null,
