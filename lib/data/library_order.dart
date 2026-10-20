@@ -1,5 +1,8 @@
 import '../models/vinyl.dart';
 
+/// Biblioteca a la que pertenece un disco: id de cuenta, 'local' o 'manual'.
+String libraryOf(Vinyl v) => v.source ?? 'manual';
+
 String _alnum(String s) =>
     s.toLowerCase().replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '');
 
