@@ -20,10 +20,10 @@ String _sortKey(String artist) {
 /// Ordena la biblioteca A→Z por artista (y año), quita duplicados
 /// (se prefiere la copia del teléfono) e inserta un separador negro con el
 /// nombre del artista siguiente entre un grupo y otro.
-List<Vinyl> arrange(List<Vinyl> all) {
+List<Vinyl> arrange(List<Vinyl> all, {bool singles = false}) {
   final best = <String, Vinyl>{};
   final order = <String>[];
-  for (final v in all) {
+  for (final v in all.where((e) => e.single == singles)) {
     final k = _albumKey(v);
     final cur = best[k];
     if (cur == null) {

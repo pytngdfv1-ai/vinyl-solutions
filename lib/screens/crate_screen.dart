@@ -29,6 +29,7 @@ class _CrateScreenState extends State<CrateScreen> {
   bool _menuOpen = false;
   String? _genre;
   String? _source;
+  bool _singlesChest = false;
 
   void _open(Vinyl v) {
     if (v.isDivider) return;
@@ -241,7 +242,9 @@ class _CrateScreenState extends State<CrateScreen> {
             _filter == _Filter.owned ? all.where((e) => e.owned).toList() : all;
         if (_genre != null) filtered = filtered.where((e) => e.genre == _genre).toList();
         if (_source != null) filtered = filtered.where((e) => e.source == _source).toList();
-        final items = arrange(filtered);
+        final items = arrange(filtered, singles: _singlesChest);
+        final albumCount = all.where((e) => !e.single).length;
+        final singleCount = all.length - albumCount;
 
         return Scaffold(
           backgroundColor: Colors.black,
@@ -317,7 +320,10 @@ class _CrateScreenState extends State<CrateScreen> {
             children: [
               Positioned.fill(
                 child: CrateView(
-                  key: ValueKey('$_filter|$_genre|$_source'),
+                  key: ValueKey('$_filter|$_genre|$_source|$_singlesChest'),
+                  emptyText: _singlesChest
+                      ? 'No hay temas sueltos\nLos singles y temas sueltos aparecen aquí al sincronizar'
+                      : 'Biblioteca vacía\nToca + y elige "Conectar Koofr"',
                   items: items,
                   onPick: _open,
                   onLongPress: _confirmDelete,
@@ -338,19 +344,14 @@ class _CrateScreenState extends State<CrateScreen> {
                           onPressed: () => Scaffold.of(ctx).openDrawer(),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _chipLabel(),
-                          style: const TextStyle(
-                            color: Color(0xFF5CFF7A),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      _ChestToggle(
+                        singles: _singlesChest,
+                        albumCount: albumCount,
+                        singleCount: singleCount,
+                        subtitle: (_filter == _Filter.owned || _genre != null || _source != null)
+                            ? _chipLabel()
+                            : null,
+                        onChanged: (s) => setState(() => _singlesChest = s),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -422,6 +423,76 @@ class _CrateScreenState extends State<CrateScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Selector de baúl: discos completos o temas sueltos.
+class _ChestToggle extends StatelessWidget {
+  const _ChestToggle({
+    required this.singles,
+    required this.albumCount,
+    required this.singleCount,
+    required this.onChanged,
+    this.subtitle,
+  });
+
+  final bool singles;
+  final int albumCount;
+  final int singleCount;
+  final ValueChanged<bool> onChanged;
+  final String? subtitle;
+
+  Widget _seg(BuildContext context, String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            color: selected ? Colors.white : Colors.white70,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _seg(context, 'Discos $albumCount', !singles, () => onChanged(false)),
+              _seg(context, 'Sueltos $singleCount', singles, () => onChanged(true)),
+            ],
+          ),
+        ),
+        if (subtitle != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 8, top: 2),
+            child: Text(
+              subtitle!,
+              style: const TextStyle(color: Color(0xFF5CFF7A), fontSize: 11, fontWeight: FontWeight.w700),
+            ),
+          ),
+      ],
     );
   }
 }
