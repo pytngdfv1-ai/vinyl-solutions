@@ -56,3 +56,16 @@ bool isBookletDir(String name) => RegExp(
       r'libreto|booklet|scans?|artwork|extras?|inlay|insert|book',
       caseSensitive: false,
     ).hasMatch(name);
+
+/// ¿La carpeta raíz está organizada en categorías (ej.: Inglés / Español)?
+/// Estructura Categoría/Artista/Álbum con pocas categorías de primer nivel.
+bool detectSplit(List<List<String>> paths) {
+  if (paths.length < 4) return false;
+  if (paths.any((p) => p.length < 3)) return false;
+  final firsts = <String, Set<String>>{};
+  for (final p in paths) {
+    firsts.putIfAbsent(p[0], () => {}).add(p[1]);
+  }
+  if (firsts.length < 2 || firsts.length > 8) return false;
+  return firsts.values.where((s) => s.length >= 2).length >= 2;
+}

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/vinyl.dart';
+import 'library_order.dart';
 
 /// Biblioteca local-first: todo vive en el dispositivo (SharedPreferences).
 class VinylStore extends ChangeNotifier {
@@ -75,7 +76,7 @@ class VinylStore extends ChangeNotifier {
   }
 
   bool _fromAccount(Vinyl v, String accountId) =>
-      v.source == accountId || (v.source == null && v.id.startsWith('dav_'));
+      sourceInAccount(v.source, accountId) || (v.source == null && v.id.startsWith('dav_'));
 
   /// Reemplaza los discos de una cuenta de Koofr por el último escaneo.
   Future<void> replaceAccount(String accountId, List<Vinyl> scanned, {String? genre}) async {
@@ -83,7 +84,7 @@ class VinylStore extends ChangeNotifier {
     final others = _items.where((v) => !_fromAccount(v, accountId)).toList();
     final fresh = [
       for (final v in scanned)
-        v.copyWith(owned: owned[v.id] ?? true, genre: genre, source: accountId),
+        v.copyWith(owned: owned[v.id] ?? true, genre: genre, source: v.source ?? accountId),
     ];
     _items = [...fresh, ...others];
     notifyListeners();
@@ -101,7 +102,7 @@ class VinylStore extends ChangeNotifier {
     final ids = {for (final a in albums) a.id};
     final owned = {for (final v in _items) v.id: v.owned};
     _items = [
-      for (final a in albums) a.copyWith(owned: owned[a.id] ?? true, source: 'local'),
+      for (final a in albums) a.copyWith(owned: owned[a.id] ?? true, source: a.source ?? 'local'),
       ..._items.where((v) => !ids.contains(v.id)),
     ];
     notifyListeners();

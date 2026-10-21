@@ -41,11 +41,24 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<_Chest> _chests(List<Vinyl> all) {
-    final libs = <_Lib>[
-      for (final a in KoofrAccounts.list) _Lib(a.id, a.name),
-      if (all.any((v) => v.source == 'local')) const _Lib('local', 'Teléfono'),
-      if (all.any((v) => v.source == null)) const _Lib('manual', 'Manuales'),
-    ];
+    final libs = <_Lib>[];
+    List<String> groups(String prefix) => {
+          for (final v in all)
+            if (v.source != null && v.source!.startsWith(prefix)) v.source!,
+        }.toList()
+          ..sort();
+    for (final acc in KoofrAccounts.list) {
+      final gs = groups('${acc.id}:');
+      if (gs.isEmpty || all.any((v) => v.source == acc.id)) libs.add(_Lib(acc.id, acc.name));
+      for (final g in gs) {
+        libs.add(_Lib(g, g.substring(acc.id.length + 1)));
+      }
+    }
+    if (all.any((v) => v.source == 'local')) libs.add(const _Lib('local', 'Teléfono'));
+    for (final g in groups('local:')) {
+      libs.add(_Lib(g, g.substring(6)));
+    }
+    if (all.any((v) => v.source == null)) libs.add(const _Lib('manual', 'Manuales'));
     final out = <_Chest>[];
     for (final lib in libs) {
       final mine = all.where((v) => libraryOf(v) == lib.id).toList();
@@ -153,14 +166,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 : SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.all(8),
-                      child: Align(
-                        child: NowPlayingChip(
-                          onOpen: (v) => openStage(
-                            context,
-                            widget.store,
-                            widget.store.items.firstWhere((e) => e.id == v.id, orElse: () => v),
+                      // Row (no Align): Align llenaría toda la pantalla en la barra inferior.
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: NowPlayingChip(
+                              onOpen: (v) => openStage(
+                                context,
+                                widget.store,
+                                widget.store.items.firstWhere((e) => e.id == v.id, orElse: () => v),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),

@@ -22,6 +22,7 @@ class _KoofrAccountScreenState extends State<KoofrAccountScreen> {
   late final _email = TextEditingController(text: widget.account?.email ?? '');
   final _password = TextEditingController();
   late final _folder = TextEditingController(text: widget.account?.folder ?? 'Música');
+  late String _split = widget.account?.split ?? 'auto';
   bool _busy = false;
   String _status = '';
 
@@ -53,6 +54,7 @@ class _KoofrAccountScreenState extends State<KoofrAccountScreen> {
       email: email,
       password: password,
       folder: _folder.text.trim().isEmpty ? 'Música' : _folder.text.trim(),
+      split: _split,
     );
     setState(() {
       _busy = true;
@@ -130,6 +132,20 @@ class _KoofrAccountScreenState extends State<KoofrAccountScreen> {
           TextField(
             controller: _folder,
             decoration: const InputDecoration(labelText: 'Carpeta de música'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _split,
+            decoration: const InputDecoration(
+              labelText: 'Subcarpetas como bibliotecas',
+              helperText: 'Ej.: Música/Inglés y Música/Español → un cajón para cada una',
+            ),
+            items: const [
+              DropdownMenuItem(value: 'auto', child: Text('Automático')),
+              DropdownMenuItem(value: 'yes', child: Text('Sí, cada subcarpeta es una biblioteca')),
+              DropdownMenuItem(value: 'no', child: Text('No, una sola biblioteca')),
+            ],
+            onChanged: (v) => setState(() => _split = v ?? 'auto'),
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
