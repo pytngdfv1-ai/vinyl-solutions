@@ -43,14 +43,32 @@ class LocalScanner {
     var skipped = 0;
 
     final dirs = byDir.keys.toList()..sort();
+
+    List<String> namesOf(String dir) {
+      final rel = dir.length > rootPath.length ? dir.substring(rootPath.length) : '';
+      return rel.split('/').where((s) => s.isNotEmpty).toList();
+    }
+
+    // ¿La carpeta está organizada en categorías (Inglés / Español…)?
+    final split = detectSplit([
+      for (final d in dirs)
+        if (byDir[d]!.where((f) => _hasExt(f.path, _audioExt)).length >= min) namesOf(d),
+    ]);
+
     for (final dir in dirs) {
       final list = byDir[dir]!;
       final audio = list.where((f) => _hasExt(f.path, _audioExt)).toList()
         ..sort((a, b) => _base(a.path).compareTo(_base(b.path)));
       if (audio.isEmpty) continue;
 
-      final rel = dir.length > rootPath.length ? dir.substring(rootPath.length) : '';
-      final names = rel.split('/').where((s) => s.isNotEmpty).toList();
+      final fullNames = namesOf(dir);
+      String? group;
+      var names = fullNames;
+      if (split && names.isNotEmpty) {
+        group = names.first;
+        names = names.sublist(1);
+      }
+      final src = group == null ? 'local' : 'local:$group';
       final images = list.where((f) => _hasExt(f.path, _imageExt)).toList();
       final pref = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
       File? art;
@@ -69,6 +87,7 @@ class LocalScanner {
           final p = f.path;
           drafts.add(AlbumDraft(
             key: p,
+            source: src,
             idPrefix: 'locs_',
             single: true,
             folderArtist: names.length >= 2 ? names[names.length - 2] : null,
@@ -105,6 +124,8 @@ class LocalScanner {
       final first = audio.first.path;
       drafts.add(AlbumDraft(
         key: dir,
+        source: src,
+        path: fullNames,
         idPrefix: 'loc_',
         folderArtist: names.length >= 2 ? names[names.length - 2] : null,
         folderAlbum: names.last,

@@ -100,6 +100,9 @@ class KoofrClient {
 
   Map<String, Vinyl> _reuse = const {};
 
+  /// true si se detectó que la carpeta raíz está dividida en categorías.
+  bool? detectedSplit;
+
   Future<ScanResult> scan({
     void Function(String)? onProgress,
     Map<String, Vinyl> reuse = const {},
@@ -114,7 +117,16 @@ class KoofrClient {
     final sample = top.take(4).map((e) => e.name).join(', ');
 
     final drafts = <AlbumDraft>[];
-    await _walk(_musicDir(), top, <String>[], drafts, onProgress);
+    await _walk(_musicDir(), top, <String>[], drafts, onProgress, split: settings.split == 'yes');
+    if (settings.split == 'auto' &&
+        detectSplit([for (final d in drafts) if (!d.single) d.path])) {
+      // Categoría/Artista/Álbum: cada categoría es su propia biblioteca.
+      drafts.clear();
+      _dirs = 0;
+      _filesSeen = 0;
+      await _walk(_musicDir(), top, <String>[], drafts, onProgress, split: true);
+      detectedSplit = true;
+    }
 
     final result = await buildAlbums(drafts, skippedBefore: _skipped, onProgress: onProgress, reuse: _reuse);
     diagnostic = 'En "${settings.folder}" vi $topDirs carpetas y $topFiles archivos'
@@ -146,8 +158,12 @@ class KoofrClient {
     List<_Entry> entries,
     List<String> names,
     List<AlbumDraft> out,
-    void Function(String)? onProgress,
-  ) async {
+    void Function(String)? onProgress, {
+    String? group,
+    bool split = false,
+  }) async {
+    final full = [if (group != null) group, ...names];
+    final src = group == null ? settings.id : '${settings.id}:$group';
     _dirs++;
     _filesSeen += entries.where((e) => !e.isDir).length;
 
@@ -167,7 +183,8 @@ class KoofrClient {
         final art0 = imgs0.where((e) => pref0.hasMatch(e.name)).firstOrNull ?? imgs0.firstOrNull;
         for (final e in audio) {
           out.add(AlbumDraft(
-            key: '${names.join('/')}/${e.name}',
+            key: '${full.join('/')}/${e.name}',
+            source: src,
             idPrefix: 'dav_${settings.id}_s_',
             single: true,
             folderArtist: names.length >= 2 ? names[names.length - 2] : null,
@@ -207,7 +224,9 @@ class KoofrClient {
         }
         final first = audio.first;
         out.add(AlbumDraft(
-          key: names.join('/'),
+          key: full.join('/'),
+          source: src,
+          path: full,
           idPrefix: 'dav_${settings.id}_',
           folderArtist: names.length >= 2 ? names[names.length - 2] : null,
           folderAlbum: names.last,
@@ -228,7 +247,12 @@ class KoofrClient {
       if (_dirs >= _maxDirs) return;
       onProgress?.call(d.name);
       final sub = await _list(d.uri);
-      await _walk(d.uri, sub, [...names, d.name], out, onProgress);
+      if (split && names.isEmpty && group == null) {
+        // Cada subcarpeta de la raíz es una biblioteca; sus rutas cuentan desde ahí.
+        await _walk(d.uri, sub, const <String>[], out, onProgress, group: d.name);
+      } else {
+        await _walk(d.uri, sub, [...names, d.name], out, onProgress, group: group);
+      }
     }
   }
 }

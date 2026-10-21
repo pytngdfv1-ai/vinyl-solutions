@@ -12,6 +12,7 @@ class KoofrSettings {
     required this.password,
     this.folder = 'Música',
     this.baseUrl = 'https://app.koofr.net/dav/Koofr',
+    this.split = 'auto',
   });
 
   final String id;
@@ -21,6 +22,20 @@ class KoofrSettings {
   final String password;
   final String folder;
   final String baseUrl;
+
+  /// ¿Cada subcarpeta de la carpeta raíz es una biblioteca? 'auto' | 'yes' | 'no'.
+  final String split;
+
+  KoofrSettings copyWith({String? split}) => KoofrSettings(
+        id: id,
+        name: name,
+        genre: genre,
+        email: email,
+        password: password,
+        folder: folder,
+        baseUrl: baseUrl,
+        split: split ?? this.split,
+      );
 
   Map<String, String> get headers => {
         'Authorization': 'Basic ${base64Encode(utf8.encode('$email:$password'))}',
@@ -33,6 +48,7 @@ class KoofrSettings {
         'email': email,
         'password': password,
         'folder': folder,
+        'split': split,
       };
 
   factory KoofrSettings.fromJson(Map<String, dynamic> j) => KoofrSettings(
@@ -42,6 +58,7 @@ class KoofrSettings {
         email: j['email'] as String,
         password: j['password'] as String,
         folder: j['folder'] as String? ?? 'Música',
+        split: j['split'] as String? ?? 'auto',
       );
 
   /// Solo se envían credenciales a servidores de Koofr (nunca a terceros).

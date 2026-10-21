@@ -3,6 +3,10 @@ import '../models/vinyl.dart';
 /// Biblioteca a la que pertenece un disco: id de cuenta, 'local' o 'manual'.
 String libraryOf(Vinyl v) => v.source ?? 'manual';
 
+/// ¿Esta fuente pertenece a la cuenta? (la cuenta o sus subcarpetas «cuenta:Nombre»)
+bool sourceInAccount(String? s, String accountId) =>
+    s == accountId || (s != null && s.startsWith('$accountId:'));
+
 String _alnum(String s) =>
     s.toLowerCase().replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '');
 

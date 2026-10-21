@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'koofr_client.dart';
 import 'koofr_settings.dart';
+import 'library_order.dart';
 import 'library_settings.dart';
 import 'vinyl_store.dart';
 
@@ -21,11 +22,12 @@ class LibrarySync {
     final client = KoofrClient(a);
     final reuse = {
       for (final v in store.items)
-        if (v.source == a.id) v.id: v,
+        if (sourceInAccount(v.source, a.id)) v.id: v,
     };
     final result = await client.scan(onProgress: onProgress, reuse: reuse);
     if (result.albums.isEmpty && keepIfEmpty) return 'Sin cambios';
-    await KoofrAccounts.upsert(a);
+    // Si detectó carpetas por categoría (Inglés / Español…), lo recuerda.
+    await KoofrAccounts.upsert(client.detectedSplit == true ? a.copyWith(split: 'yes') : a);
     await store.replaceAccount(
       a.id,
       result.albums,

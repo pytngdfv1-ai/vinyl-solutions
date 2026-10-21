@@ -20,6 +20,8 @@ class AlbumDraft {
     this.pdfs = const [],
     this.single = false,
     this.fallbackArtist,
+    this.source,
+    this.path = const [],
     this.readMeta,
   });
 
@@ -36,6 +38,10 @@ class AlbumDraft {
   /// Tema suelto (va al baúl de sueltos). [fallbackArtist] se usa si no hay etiquetas.
   final bool single;
   final String? fallbackArtist;
+
+  /// Biblioteca de origen y ruta completa de carpetas (para detectar categorías).
+  final String? source;
+  final List<String> path;
   final Future<FlacMeta?> Function()? readMeta;
 
   String get id => '$idPrefix${base64Url.encode(utf8.encode(key))}';
@@ -176,6 +182,7 @@ Future<Vinyl?> _build(AlbumDraft d) async {
     booklet: d.bookletImages,
     pdfs: d.pdfs,
     single: d.single,
+    source: d.source,
     owned: true,
   );
 }

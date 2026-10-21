@@ -126,6 +126,11 @@ class _StageScreenState extends State<StageScreen> {
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
+                  IconButton(
+                    tooltip: 'Menú principal',
+                    icon: const Icon(Icons.home_outlined),
+                    onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  ),
                   const Spacer(),
                   if (v.hasBooklet)
                     IconButton(

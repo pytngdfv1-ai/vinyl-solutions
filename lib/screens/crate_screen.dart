@@ -234,8 +234,9 @@ class _CrateScreenState extends State<CrateScreen> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.of(context).pop(),
+                        tooltip: 'Menú principal',
+                        icon: const Icon(Icons.home_outlined),
+                        onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
                       ),
                       Builder(
                         builder: (ctx) => IconButton(
