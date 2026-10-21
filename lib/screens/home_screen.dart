@@ -8,6 +8,7 @@ import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/now_playing_chip.dart';
+import 'backup_screen.dart';
 import 'crate_screen.dart';
 import 'koofr_screen.dart';
 import 'library_actions.dart';
@@ -114,6 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       _push(LocalScreen(store: widget.store));
                     case 'disc':
                       addDisc(context, widget.store);
+                    case 'backup':
+                      _push(BackupScreen(store: widget.store));
                     case 'settings':
                       showLibrarySettings(context);
                     case 'clear':
@@ -125,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuItem(value: 'local', child: Text('Carpeta del teléfono')),
                   PopupMenuItem(value: 'disc', child: Text('Agregar disco a mano')),
                   PopupMenuDivider(),
+                  PopupMenuItem(value: 'backup', child: Text('Copia de seguridad')),
                   PopupMenuItem(value: 'settings', child: Text('Ajustes de biblioteca')),
                   PopupMenuItem(value: 'clear', child: Text('Borrar todo')),
                 ],

@@ -109,6 +109,22 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Restaura discos agregados a mano (copia de seguridad).
+  Future<void> restoreManual(List<Vinyl> list) async {
+    final ids = {for (final v in list) v.id};
+    _items = [...list, ..._items.where((v) => !ids.contains(v.id))];
+    notifyListeners();
+    await _save();
+  }
+
+  /// Marca como "no en colección" los discos indicados (copia de seguridad).
+  Future<void> markNotOwned(List<String> ids) async {
+    final s = ids.toSet();
+    _items = [for (final v in _items) s.contains(v.id) ? v.copyWith(owned: false) : v];
+    notifyListeners();
+    await _save();
+  }
+
   Future<void> _save() async {
     await _prefs?.setString(
       _key,

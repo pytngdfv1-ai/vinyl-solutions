@@ -5,9 +5,15 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -27,17 +33,35 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.log || true
 
+      - name: Prepare signing
+        shell: bash
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.p12
+            printf 'storeFile=release.p12\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=vinyl\n' "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > android/key.properties
+            echo "Firma fija activada"
+          else
+            echo "::warning title=Sin firma fija::Faltan los secretos KEYSTORE_BASE64 y KEYSTORE_PASSWORD. El APK queda con firma de depuración y NO se podrá instalar encima de otro."
+          fi
+
       - name: Build APK
         shell: bash
-        run: flutter build apk --release 2>&1 | tee build.log
+        run: flutter build apk --release --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }} 2>&1 | tee build.log
+
+      - name: Verify signature
+        shell: bash
+        run: |
+          AS="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$AS" verify --print-certs build/app/outputs/flutter-apk/app-release.apk 2>&1 | tee sign.log
+          echo "::notice title=Firma del APK::$(grep 'SHA-256' sign.log | head -1)"
 
       - name: Show errors
         if: failure()
         shell: bash
         run: |
-          for f in analyze.log build.log; do
+          for f in analyze.log build.log sign.log; do
             [ -f "$f" ] || continue
-            msg=$(grep -E " error •|Error|error:|FAILURE|What went wrong|Could not|e: |not found|Exception" "$f" | head -40 || true)
+            msg=$(grep -E " error •|Error|error:|FAILURE|What went wrong|Could not|e: |not found|Exception|keystore|Keystore" "$f" | head -40 || true)
             [ -n "$msg" ] || msg=$(tail -n 30 "$f")
             msg="${msg//'%'/'%25'}"
             msg="${msg//$'\n'/'%0A'}"
@@ -51,8 +75,19 @@ jobs:
           path: |
             analyze.log
             build.log
+            sign.log
 
       - uses: actions/upload-artifact@v4
         with:
           name: vinyl-solutions-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Publish release (APK signed, main only)
+        if: github.event_name == 'push' && env.KEYSTORE_BASE64 != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk VinylSolutions.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest VinylSolutions.apk --title "VinylSolutions 1.0.${{ github.run_number }}" --notes "APK firmado. Descárgalo e instálalo encima de la versión anterior (se conserva todo)."
