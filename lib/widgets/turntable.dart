@@ -14,12 +14,17 @@ Offset _rot(Offset v, double t) => Offset(
 
 /// Geometría compartida del tocadisco.
 class _Geo {
-  _Geo(Size s)
+  _Geo(Size s, {this.scale = 1.0})
       : w = s.width,
         h = s.height;
 
   final double w;
   final double h;
+
+  /// Tamaño del disco respecto al plato: 1 = LP, 0.8 = 10", 0.64 = single de 7".
+  final double scale;
+  double get dr => r * scale;
+  double get labelRatio => scale >= 1 ? 0.33 : (scale > 0.7 ? 0.40 : 0.48);
 
   Offset get center => Offset(w * 0.39, h * 0.50);
   double get r => math.min(w * 0.34, h * 0.405);
@@ -30,7 +35,7 @@ class _Geo {
   double get _a0 => math.atan2(pivot.dx - center.dx, center.dy - pivot.dy);
 
   /// Largo del brazo: llega hasta cerca de la etiqueta (surco interior).
-  double get armLen => _dist - r * 0.42;
+  double get armLen => _dist - r * 0.25;
 
   /// Ángulo del brazo para que la aguja quede a [rad] del centro del disco.
   double angleFor(double rad) {
@@ -43,6 +48,8 @@ class _Geo {
   Offset tip(double a) => pivot + Offset(-math.sin(a), math.cos(a)) * armLen;
 }
 
+int _bands(int tracks) => math.min(math.max(1, tracks), 31);
+
 /// Tocadisco plano y claro: el disco gira, la etiqueta lleva la portada y el
 /// brazo avanza del borde exterior al centro a medida que avanza el tema.
 class Turntable extends StatefulWidget {
@@ -51,6 +58,9 @@ class Turntable extends StatefulWidget {
     required this.vinyl,
     required this.playing,
     this.progress = 0,
+    this.trackIndex = 0,
+    this.trackCount = 1,
+    this.single = false,
   });
 
   final Vinyl vinyl;
@@ -58,6 +68,13 @@ class Turntable extends StatefulWidget {
 
   /// Avance del tema actual (0 = inicio, 1 = final).
   final double progress;
+
+  /// Tema actual, cantidad de temas (una banda de surcos por tema) y si es un tema suelto.
+  final int trackIndex;
+  final int trackCount;
+  final bool single;
+
+  double get scale => single ? 0.64 : (trackCount <= 4 ? 0.8 : 1.0);
 
   @override
   State<Turntable> createState() => _TurntableState();
@@ -109,15 +126,19 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
       aspectRatio: 1.5,
       child: LayoutBuilder(
         builder: (context, c) {
-          final g = _Geo(Size(c.maxWidth, c.maxHeight));
-          final lr = g.r * 0.33;
+          final g = _Geo(Size(c.maxWidth, c.maxHeight), scale: widget.scale);
+          final lr = g.dr * g.labelRatio;
           return Stack(
             children: [
               Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _spin,
                   builder: (_, __) => CustomPaint(
-                    painter: _DiscPainter(spin: _spin.value),
+                    painter: _DiscPainter(
+                      spin: _spin.value,
+                      scale: widget.scale,
+                      tracks: widget.trackCount,
+                    ),
                   ),
                 ),
               ),
@@ -139,6 +160,9 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
                     animation: _arm,
                     builder: (_, __) => CustomPaint(
                       painter: _ArmPainter(
+                        scale: widget.scale,
+                        trackIndex: widget.trackIndex,
+                        trackCount: widget.trackCount,
                         progress: p,
                         arm: Curves.easeInOut.transform(_arm.value),
                       ),
@@ -173,13 +197,15 @@ class _Label extends StatelessWidget {
 
 /// Base, plato, disco con reflejos y control de velocidad.
 class _DiscPainter extends CustomPainter {
-  _DiscPainter({required this.spin});
+  _DiscPainter({required this.spin, required this.scale, required this.tracks});
 
   final double spin;
+  final double scale;
+  final int tracks;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final g = _Geo(size);
+    final g = _Geo(size, scale: scale);
     final w = size.width;
     final h = size.height;
 
@@ -225,6 +251,7 @@ class _DiscPainter extends CustomPainter {
 
     // Plato.
     final r = g.r;
+    final dr = g.dr;
     canvas.drawCircle(
       g.center + Offset(0, r * 0.03),
       r * 1.1,
@@ -238,13 +265,13 @@ class _DiscPainter extends CustomPainter {
     canvas.save();
     canvas.translate(g.center.dx, g.center.dy);
     canvas.rotate(spin * 2 * math.pi);
-    canvas.drawCircle(Offset.zero, r, Paint()..color = const Color(0xFF2A2A2C));
+    canvas.drawCircle(Offset.zero, dr, Paint()..color = const Color(0xFF2A2A2C));
 
     // Reflejos en sectores (arriba y abajo), como el disco de referencia.
-    final bandRect = Rect.fromCircle(center: Offset.zero, radius: r * 0.70);
+    final bandRect = Rect.fromCircle(center: Offset.zero, radius: dr * 0.70);
     Paint band(Color c) => Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = r * 0.50
+      ..strokeWidth = dr * 0.50
       ..color = c;
     final mid = band(const Color(0xFF3B3B3E));
     final light = band(const Color(0xFF515154));
@@ -253,16 +280,37 @@ class _DiscPainter extends CustomPainter {
       canvas.drawArc(bandRect, c - 16 * _deg, 32 * _deg, false, light);
     }
 
-    // Surcos.
-    final groove = Paint()
+    // Surcos finos y una separación (más oscura) entre cada tema.
+    final ro = dr * 0.93;
+    final ri = dr * (g.labelRatio + 0.10);
+    final fine = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.0, r * 0.008)
-      ..color = const Color(0xFF0E0E10);
-    canvas.drawCircle(Offset.zero, r * 0.79, groove);
-    canvas.drawCircle(Offset.zero, r * 0.63, groove);
+      ..strokeWidth = math.max(0.5, dr * 0.004)
+      ..color = Colors.white.withOpacity(0.05);
+    for (var rad = ro; rad > ri; rad -= dr * 0.03) {
+      canvas.drawCircle(Offset.zero, rad, fine);
+    }
+    final bands = _bands(tracks);
+    final gap = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1.4, dr * 0.014)
+      ..color = const Color(0xFF050507);
+    final rim = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.6, dr * 0.005)
+      ..color = Colors.white.withOpacity(0.12);
+    for (var k = 1; k < bands; k++) {
+      final rad = ro - (ro - ri) * k / bands;
+      canvas.drawCircle(Offset.zero, rad, gap);
+      canvas.drawCircle(Offset.zero, rad + dr * 0.012, rim);
+    }
 
     // Anillo negro alrededor de la etiqueta.
-    canvas.drawCircle(Offset.zero, r * 0.46, Paint()..color = const Color(0xFF111113));
+    canvas.drawCircle(
+      Offset.zero,
+      dr * (g.labelRatio + 0.13),
+      Paint()..color = const Color(0xFF111113),
+    );
     canvas.restore();
   }
 
@@ -272,24 +320,42 @@ class _DiscPainter extends CustomPainter {
 
 /// Eje central, base del brazo, brazo curvo con contrapeso y cápsula.
 class _ArmPainter extends CustomPainter {
-  _ArmPainter({required this.progress, required this.arm});
+  _ArmPainter({
+    required this.progress,
+    required this.arm,
+    required this.scale,
+    required this.trackIndex,
+    required this.trackCount,
+  });
 
   final double progress;
   final double arm;
+  final double scale;
+  final int trackIndex;
+  final int trackCount;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final g = _Geo(size);
+    final g = _Geo(size, scale: scale);
     final r = g.r;
+    final dr = g.dr;
     final bR = g.baseR;
 
     // Eje blanco sobre la etiqueta.
     canvas.drawCircle(g.center + Offset(0, r * 0.014), r * 0.05, Paint()..color = const Color(0xFFB5413C));
     canvas.drawCircle(g.center, r * 0.05, Paint()..color = Colors.white);
 
-    // Surco exterior (inicio del tema) -> surco interior (final del tema).
-    final aPlay = g.angleFor(r * (0.93 - 0.51 * progress.clamp(0.0, 1.0)));
-    final aRest = g.angleFor(r * 0.93) - 0.30; // brazo fuera del disco
+    // La aguja recorre la banda del tema actual: de su borde exterior al interior.
+    final ro = dr * 0.93;
+    final ri = dr * (g.labelRatio + 0.10);
+    final bands = _bands(trackCount);
+    final idx = trackCount > bands
+        ? (trackIndex * bands ~/ trackCount).clamp(0, bands - 1)
+        : trackIndex.clamp(0, bands - 1);
+    final width = (ro - ri) / bands;
+    final radius = ro - (idx + progress.clamp(0.0, 1.0)) * width;
+    final aPlay = g.angleFor(radius);
+    final aRest = g.angleFor(ro) - 0.30; // brazo fuera del disco
     final a = aRest + (aPlay - aRest) * arm;
 
     final tip = g.tip(a);
@@ -384,5 +450,9 @@ class _ArmPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ArmPainter old) =>
-      old.progress != progress || old.arm != arm;
+      old.progress != progress ||
+      old.arm != arm ||
+      old.scale != scale ||
+      old.trackIndex != trackIndex ||
+      old.trackCount != trackCount;
 }
