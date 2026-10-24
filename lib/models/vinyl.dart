@@ -14,6 +14,7 @@ class Vinyl {
     this.genre,
     this.source,
     this.single = false,
+    this.cassette = false,
   });
 
   final String id;
@@ -39,6 +40,9 @@ class Vinyl {
   /// Tema suelto (single, recopilación) en vez de álbum completo.
   final bool single;
 
+  /// Cover: se reproduce en el casetero y vive en el baúl "Covers".
+  final bool cassette;
+
   /// Separador generado entre artistas (no es un disco real).
   bool get isDivider => id.startsWith('sep_');
 
@@ -55,6 +59,7 @@ class Vinyl {
     String? coverUrl,
     List<String>? booklet,
     List<String>? pdfs,
+    bool? cassette,
   }) =>
       Vinyl(
         id: id,
@@ -71,6 +76,7 @@ class Vinyl {
         genre: genre ?? this.genre,
         source: source ?? this.source,
         single: single,
+        cassette: cassette ?? this.cassette,
       );
 
   Map<String, dynamic> toJson() => {
@@ -88,6 +94,7 @@ class Vinyl {
         'genre': genre,
         'source': source,
         'single': single,
+        'cassette': cassette,
       };
 
   factory Vinyl.fromJson(Map<String, dynamic> j) => Vinyl(
@@ -105,5 +112,6 @@ class Vinyl {
         genre: j['genre'] as String?,
         source: j['source'] as String?,
         single: j['single'] as bool? ?? false,
+        cassette: j['cassette'] as bool? ?? false,
       );
 }

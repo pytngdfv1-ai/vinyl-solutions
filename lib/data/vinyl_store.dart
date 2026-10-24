@@ -63,6 +63,23 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Marca / desmarca un disco como cover (casetero).
+  Future<void> setCassette(String id, bool on, {String? coverUrl}) async {
+    _items = [
+      for (final v in _items)
+        v.id == id ? v.copyWith(cassette: on, coverUrl: v.coverUrl ?? coverUrl) : v,
+    ];
+    notifyListeners();
+    await _save();
+  }
+
+  Future<void> markCassette(List<String> ids) async {
+    final s = ids.toSet();
+    _items = [for (final v in _items) s.contains(v.id) ? v.copyWith(cassette: true) : v];
+    notifyListeners();
+    await _save();
+  }
+
   Future<void> toggleOwned(String id) async {
     _items = [
       for (final v in _items) v.id == id ? v.copyWith(owned: !v.owned) : v,
@@ -79,6 +96,7 @@ class VinylStore extends ChangeNotifier {
 
   /// Datos que se conservan al mover: ruta nueva (relativa) -> {cover, owned, genre}.
   Map<String, Map<String, dynamic>> _carry = {};
+  Set<String> _cassettes = {};
 
   Future<void> addCarry(Map<String, Map<String, dynamic>> m) async {
     _carry = {..._carry, ...m};
@@ -104,7 +122,11 @@ class VinylStore extends ChangeNotifier {
 
   Vinyl _applyCarry(Vinyl v, Map<String, bool> owned, String? genre, String accountId,
       List<String> used) {
-    var r = v.copyWith(owned: owned[v.id] ?? true, genre: genre, source: v.source ?? accountId);
+    var r = v.copyWith(
+        owned: owned[v.id] ?? true,
+        genre: genre,
+        source: v.source ?? accountId,
+        cassette: _cassettes.contains(v.id) ? true : null);
     if (v.trackUrls.isEmpty || _carry.isEmpty) return r;
     final path = Uri.decodeFull(Uri.parse(v.trackUrls.first).removeFragment().path);
     for (final e in _carry.entries) {
@@ -114,6 +136,7 @@ class VinylStore extends ChangeNotifier {
         r = r.copyWith(
           owned: owned.containsKey(v.id) ? r.owned : (e.value['owned'] as bool? ?? true),
           coverUrl: v.coverUrl ?? c,
+          cassette: (e.value['cassette'] as bool? ?? false) ? true : null,
         );
         break;
       }
@@ -124,6 +147,7 @@ class VinylStore extends ChangeNotifier {
   /// Reemplaza los discos de una cuenta de Koofr por el último escaneo.
   Future<void> replaceAccount(String accountId, List<Vinyl> scanned, {String? genre}) async {
     final owned = {for (final v in _items) v.id: v.owned};
+    _cassettes = {for (final v in _items) if (v.cassette) v.id};
     final others = _items.where((v) => !_fromAccount(v, accountId)).toList();
     final used = <String>[];
     final fresh = [
@@ -150,8 +174,13 @@ class VinylStore extends ChangeNotifier {
   Future<void> addAlbums(List<Vinyl> albums) async {
     final ids = {for (final a in albums) a.id};
     final owned = {for (final v in _items) v.id: v.owned};
+    final cas = {for (final v in _items) if (v.cassette) v.id};
     _items = [
-      for (final a in albums) a.copyWith(owned: owned[a.id] ?? true, source: a.source ?? 'local'),
+      for (final a in albums)
+        a.copyWith(
+            owned: owned[a.id] ?? true,
+            source: a.source ?? 'local',
+            cassette: cas.contains(a.id) ? true : null),
       ..._items.where((v) => !ids.contains(v.id)),
     ];
     notifyListeners();

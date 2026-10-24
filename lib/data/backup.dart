@@ -39,6 +39,10 @@ class BackupService {
         for (final v in store.items)
           if (!v.owned) v.id,
       ],
+      'cassettes': [
+        for (final v in store.items)
+          if (v.cassette) v.id,
+      ],
       'manual': [
         for (final v in store.items)
           if (v.source == null && !v.id.startsWith('dav_')) v.toJson(),
@@ -103,8 +107,14 @@ class BackupService {
     final notOwned = (d['notOwned'] as List? ?? const []).cast<String>();
     if (notOwned.isNotEmpty) await store.markNotOwned(notOwned);
 
+    final cassettes = (d['cassettes'] as List? ?? const []).cast<String>();
+    if (cassettes.isNotEmpty) await store.markCassette(cassettes);
+
     // Sincroniza las nubes en segundo plano y reaplica las marcas.
-    LibrarySync.syncAll(store).then((_) => store.markNotOwned(notOwned));
+    LibrarySync.syncAll(store).then((_) {
+      store.markNotOwned(notOwned);
+      store.markCassette(cassettes);
+    });
     return '${accounts.length} cuentas restauradas. Sincronizando en segundo plano…';
   }
 }
