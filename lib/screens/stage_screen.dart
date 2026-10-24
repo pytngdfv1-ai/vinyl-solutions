@@ -3,11 +3,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../audio/player_service.dart';
+import '../data/koofr_settings.dart';
+import '../data/library_order.dart';
+import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
 import 'booklet_screen.dart';
+import 'move_dialog.dart';
 
 /// Disco sacado de la caja: tornamesa arriba, carátula abajo.
 /// Toca la carátula para darla vuelta (pistas), la tornamesa para play/pausa.
@@ -445,6 +449,14 @@ class DetailSheet extends StatelessWidget {
   final VinylStore store;
   final Vinyl vinyl;
 
+  /// Cuenta de Koofr a la que pertenece el disco (null si es local o manual).
+  static KoofrSettings? _cloudAccount(Vinyl v) {
+    for (final a in KoofrAccounts.list) {
+      if (sourceInAccount(v.source, a.id)) return a;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -493,6 +505,29 @@ class DetailSheet extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (_cloudAccount(v) != null) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.drive_file_move_outline),
+                      label: const Text('Mover a…'),
+                      onPressed: () async {
+                        final acct = _cloudAccount(v)!;
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => MoveDialog(store: store, vinyl: v, account: acct),
+                        );
+                        if (ok == true && context.mounted) {
+                          LibrarySync.refresh(acct, store);
+                          Navigator.of(context)
+                            ..pop()
+                            ..pop();
+                        }
+                      },
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 const Text('LISTA DE PISTAS', style: TextStyle(color: Colors.white60, fontSize: 12)),
                 const SizedBox(height: 6),
