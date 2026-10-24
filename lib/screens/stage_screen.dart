@@ -72,7 +72,7 @@ class _StageScreenState extends State<StageScreen> {
   /// Tornamesa para discos; casetero para los covers.
   Widget _vis({required bool playing, double progress = 0, int trackIndex = 0}) {
     if (v.cassette) {
-      final i = trackIndex.clamp(0, math.max(0, v.tracks.length - 1));
+      final i = trackIndex.clamp(0, math.max(0, v.tracks.length - 1)).toInt();
       final t = v.tracks.isEmpty ? v.title : v.tracks[i];
       return CassetteDeck(
         vinyl: v,
