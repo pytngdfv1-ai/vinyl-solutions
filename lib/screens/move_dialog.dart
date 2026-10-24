@@ -76,6 +76,20 @@ class _MoveDialogState extends State<MoveDialog> {
     });
     try {
       await _client.execute(plan);
+      // Guarda lo que no se puede recuperar al releer (portada en línea/incrustada, "no lo tengo").
+      final carry = <String, Map<String, dynamic>>{};
+      for (final it in widget.store.items) {
+        if (sourceInAccount(it.source, widget.account.id) && it.trackUrls.isNotEmpty) {
+          final rel = _client.relSegments(it.trackUrls.first);
+          if (KoofrClient.isUnder(plan.from, rel)) {
+            final nrel = [...plan.to, ...rel.sublist(plan.from.length)];
+            final c = it.coverUrl;
+            final keep = c != null && !c.contains('koofr.net');
+            carry[nrel.join('/')] = {'cover': keep ? c : null, 'owned': it.owned};
+          }
+        }
+      }
+      await widget.store.addCarry(carry);
       // Quita de la biblioteca lo movido y detiene la música si era de ahí.
       final ids = <String>[
         for (final it in widget.store.items)

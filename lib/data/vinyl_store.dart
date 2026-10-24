@@ -17,6 +17,15 @@ class VinylStore extends ChangeNotifier {
 
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
+    try {
+      final c = _prefs!.getString('move_carry_v1');
+      if (c != null) {
+        _carry = {
+          for (final e in (jsonDecode(c) as Map<String, dynamic>).entries)
+            e.key: Map<String, dynamic>.from(e.value as Map),
+        };
+      }
+    } catch (_) {}
     final raw = _prefs!.getString(_key);
     if (raw != null) {
       try {
@@ -68,6 +77,14 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Datos que se conservan al mover: ruta nueva (relativa) -> {cover, owned, genre}.
+  Map<String, Map<String, dynamic>> _carry = {};
+
+  Future<void> addCarry(Map<String, Map<String, dynamic>> m) async {
+    _carry = {..._carry, ...m};
+    await _prefs?.setString('move_carry_v1', jsonEncode(_carry));
+  }
+
   Future<void> removeMany(Iterable<String> ids) async {
     final s = ids.toSet();
     _items = _items.where((v) => !s.contains(v.id)).toList();
@@ -85,14 +102,39 @@ class VinylStore extends ChangeNotifier {
   bool _fromAccount(Vinyl v, String accountId) =>
       sourceInAccount(v.source, accountId) || (v.source == null && v.id.startsWith('dav_'));
 
+  Vinyl _applyCarry(Vinyl v, Map<String, bool> owned, String? genre, String accountId,
+      List<String> used) {
+    var r = v.copyWith(owned: owned[v.id] ?? true, genre: genre, source: v.source ?? accountId);
+    if (v.trackUrls.isEmpty || _carry.isEmpty) return r;
+    final path = Uri.decodeFull(Uri.parse(v.trackUrls.first).removeFragment().path);
+    for (final e in _carry.entries) {
+      if (path.endsWith('/${e.key}')) {
+        used.add(e.key);
+        final c = e.value['cover'] as String?;
+        r = r.copyWith(
+          owned: owned.containsKey(v.id) ? r.owned : (e.value['owned'] as bool? ?? true),
+          coverUrl: v.coverUrl ?? c,
+        );
+        break;
+      }
+    }
+    return r;
+  }
+
   /// Reemplaza los discos de una cuenta de Koofr por el último escaneo.
   Future<void> replaceAccount(String accountId, List<Vinyl> scanned, {String? genre}) async {
     final owned = {for (final v in _items) v.id: v.owned};
     final others = _items.where((v) => !_fromAccount(v, accountId)).toList();
+    final used = <String>[];
     final fresh = [
-      for (final v in scanned)
-        v.copyWith(owned: owned[v.id] ?? true, genre: genre, source: v.source ?? accountId),
+      for (final v in scanned) _applyCarry(v, owned, genre, accountId, used),
     ];
+    if (used.isNotEmpty) {
+      for (final k in used) {
+        _carry.remove(k);
+      }
+      await _prefs?.setString('move_carry_v1', jsonEncode(_carry));
+    }
     _items = [...fresh, ...others];
     notifyListeners();
     await _save();
