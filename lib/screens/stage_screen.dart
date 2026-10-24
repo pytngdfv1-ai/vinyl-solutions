@@ -8,6 +8,8 @@ import '../data/library_order.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
+import '../data/cover_lookup.dart';
+import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
 import 'booklet_screen.dart';
@@ -67,26 +69,64 @@ class _StageScreenState extends State<StageScreen> {
 
   // La música NO se detiene al cerrar esta pantalla.
 
+  /// Tornamesa para discos; casetero para los covers.
+  Widget _vis({required bool playing, double progress = 0, int trackIndex = 0}) {
+    if (v.cassette) {
+      final i = trackIndex.clamp(0, math.max(0, v.tracks.length - 1));
+      final t = v.tracks.isEmpty ? v.title : v.tracks[i];
+      return CassetteDeck(
+        vinyl: v,
+        playing: playing,
+        progress: progress,
+        trackIndex: i,
+        label: '$t – ${v.artist}',
+        onPlay: _play,
+        onPause: _pause,
+        onPrev: _prev,
+        onNext: _next,
+        onEject: () => Navigator.of(context).pop(),
+      );
+    }
+    return Turntable(
+      vinyl: v,
+      playing: playing,
+      progress: progress,
+      trackIndex: trackIndex,
+      trackCount: v.tracks.length,
+      single: v.single,
+    );
+  }
+
+  Future<void> _play() async {
+    if (!v.hasAudio) {
+      setState(() => _simPlaying = true);
+      return;
+    }
+    if (_audio.nowPlaying.value?.id != v.id) {
+      await _ensureLoaded();
+      return;
+    }
+    await _audio.player.play();
+  }
+
+  Future<void> _pause() async {
+    if (!v.hasAudio) {
+      setState(() => _simPlaying = false);
+      return;
+    }
+    if (_audio.nowPlaying.value?.id == v.id) await _audio.player.pause();
+  }
+
   Widget _turntable() {
     if (!v.hasAudio) {
-      return Turntable(
-        vinyl: v,
-        playing: _simPlaying,
-        trackCount: v.tracks.length,
-        single: v.single,
-      );
+      return _vis(playing: _simPlaying);
     }
     final p = _audio.player;
     return ValueListenableBuilder<Vinyl?>(
       valueListenable: _audio.nowPlaying,
       builder: (_, np, __) {
         if (np?.id != v.id) {
-          return Turntable(
-            vinyl: v,
-            playing: false,
-            trackCount: v.tracks.length,
-            single: v.single,
-          );
+          return _vis(playing: false);
         }
         return StreamBuilder<bool>(
           stream: p.playingStream,
@@ -100,13 +140,10 @@ class _StageScreenState extends State<StageScreen> {
                 final dur = p.duration?.inMilliseconds ?? 0;
                 final cur = (pos.data ?? Duration.zero).inMilliseconds;
                 final prog = dur > 0 ? (cur / dur).clamp(0.0, 1.0).toDouble() : 0.0;
-                return Turntable(
-                  vinyl: v,
+                return _vis(
                   playing: ps.data ?? false,
                   progress: prog,
                   trackIndex: ix.data ?? 0,
-                  trackCount: v.tracks.length,
-                  single: v.single,
                 );
               },
             ),
@@ -504,6 +541,28 @@ class DetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Es un cover (reproducir en cassette)'),
+                  value: v.cassette,
+                  onChanged: (on) async {
+                    String? cover;
+                    if (on && v.coverUrl == null) {
+                      // Busca la portada del cover (tema + artista) en internet.
+                      try {
+                        cover = (await CoverLookup.find(
+                          artist: v.artist,
+                          albums: [v.title],
+                          tracks: v.tracks,
+                          trackFirst: true,
+                        ))
+                            ?.url;
+                      } catch (_) {}
+                    }
+                    await store.setCassette(v.id, on, coverUrl: cover);
+                  },
                 ),
                 if (_cloudAccount(v) != null) ...[
                   const SizedBox(height: 8),

@@ -10,6 +10,7 @@ import '../widgets/cover_art.dart';
 import '../widgets/now_playing_chip.dart';
 import 'backup_screen.dart';
 import 'crate_screen.dart';
+import 'covers_screen.dart';
 import 'koofr_screen.dart';
 import 'library_actions.dart';
 import 'local_screen.dart';
@@ -18,6 +19,12 @@ class _Lib {
   const _Lib(this.id, this.name);
   final String id;
   final String name;
+}
+
+/// Nombre mostrado de una biblioteca: nunca dice "Koofr".
+String _libName(String n) {
+  final r = n.replaceAll(RegExp('koofr', caseSensitive: false), 'Nube').trim();
+  return r.isEmpty ? 'Nube' : r;
 }
 
 class _Chest {
@@ -50,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ..sort();
     for (final acc in KoofrAccounts.list) {
       final gs = groups('${acc.id}:');
-      if (gs.isEmpty || all.any((v) => v.source == acc.id)) libs.add(_Lib(acc.id, acc.name));
+      if (gs.isEmpty || all.any((v) => v.source == acc.id)) libs.add(_Lib(acc.id, _libName(acc.name)));
       for (final g in gs) {
         libs.add(_Lib(g, g.substring(acc.id.length + 1)));
       }
@@ -153,6 +160,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSpacing: 20,
                   childAspectRatio: 0.92,
                   children: [
+                    if (widget.store.items.any((v) => v.cassette))
+                      _CrateTile(
+                        label: 'Covers',
+                        count: widget.store.items.where((v) => v.cassette).length,
+                        singles: true,
+                        covers: widget.store.items.where((v) => v.cassette).toList(),
+                        onTap: () => _push(CoversScreen(store: widget.store)),
+                      ),
                     for (final c in chests)
                       _CrateTile(
                         label: c.label,

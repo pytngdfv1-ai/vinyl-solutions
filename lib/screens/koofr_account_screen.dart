@@ -49,7 +49,7 @@ class _KoofrAccountScreenState extends State<KoofrAccountScreen> {
     }
     final s = KoofrSettings(
       id: widget.account?.id ?? KoofrAccounts.newId(),
-      name: _name.text.trim().isEmpty ? 'Koofr' : _name.text.trim(),
+      name: _name.text.trim().isEmpty ? 'Nube' : _name.text.trim(),
       genre: _genre.text.trim(),
       email: email,
       password: password,
