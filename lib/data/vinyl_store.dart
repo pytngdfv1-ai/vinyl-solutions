@@ -68,6 +68,13 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  Future<void> removeMany(Iterable<String> ids) async {
+    final s = ids.toSet();
+    _items = _items.where((v) => !s.contains(v.id)).toList();
+    notifyListeners();
+    await _save();
+  }
+
   /// Borra toda la biblioteca guardada en la app.
   Future<void> clearAll() async {
     _items = [];

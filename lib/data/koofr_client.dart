@@ -18,6 +18,14 @@ class KoofrException implements Exception {
   String toString() => message;
 }
 
+/// Movimiento de una carpeta o archivo dentro de la cuenta (rutas relativas a la carpeta raíz).
+class MovePlan {
+  const MovePlan(this.from, this.to, {required this.isDir});
+  final List<String> from;
+  final List<String> to;
+  final bool isDir;
+}
+
 class _Entry {
   _Entry(this.uri, this.isDir);
   final Uri uri;
@@ -97,6 +105,117 @@ class KoofrClient {
   }
 
   String _u(Uri u) => KoofrSettings.tag(u.toString(), settings.id);
+
+  // ---- Mover (WebDAV MKCOL / MOVE). Nunca borra ni sobrescribe. ----
+
+  List<String> get _rootSegs => _musicDir().pathSegments.where((s) => s.isNotEmpty).toList();
+
+  Uri _under(List<String> segs, {bool dir = false}) =>
+      _musicDir().replace(pathSegments: [..._rootSegs, ...segs, if (dir) '']);
+
+  /// Segmentos (decodificados) de una URL de esta cuenta, relativos a la carpeta raíz.
+  List<String> relSegments(String url) {
+    final segs = Uri.parse(url).removeFragment().pathSegments.where((s) => s.isNotEmpty).toList();
+    final root = _rootSegs;
+    return segs.length >= root.length ? segs.sublist(root.length) : segs;
+  }
+
+  /// Carpetas de primer nivel de la carpeta raíz (destinos posibles).
+  Future<List<String>> topFolders() async {
+    final entries = await _list(_musicDir());
+    return [
+      for (final e in entries)
+        if (e.isDir) e.name,
+    ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }
+
+  static String _clean(String s) => s.replaceAll(RegExp(r'[\\/:*?"<>|]'), '-').trim();
+
+  static String cleanName(String s) => _clean(s);
+
+  bool _inCategory(Vinyl v) => v.source?.contains(':') == true;
+
+  /// ¿Se puede mover todo el artista? (álbum con carpeta de artista identificable)
+  bool hasArtistFolder(Vinyl v) {
+    if (v.single || v.trackUrls.isEmpty) return false;
+    final rel = relSegments(v.trackUrls.first);
+    return rel.length - 1 >= (_inCategory(v) ? 3 : 2);
+  }
+
+  /// Plan para mover [v] a la carpeta [dest] (mantiene Artista/Álbum).
+  MovePlan? plan(Vinyl v, String dest, {bool wholeArtist = false}) {
+    if (v.trackUrls.isEmpty || dest.trim().isEmpty) return null;
+    final rel = relSegments(v.trackUrls.first);
+    final inCat = _inCategory(v);
+    if (!v.single) {
+      if (rel.length < 2) return null;
+      final dirs = rel.sublist(0, rel.length - 1);
+      final hasArtist = dirs.length >= (inCat ? 3 : 2);
+      final artist = hasArtist ? dirs[dirs.length - 2] : _clean(v.artist);
+      if (wholeArtist && hasArtist) {
+        return MovePlan(dirs.sublist(0, dirs.length - 1), [dest, artist], isDir: true);
+      }
+      return MovePlan(dirs, [dest, artist, dirs.last], isDir: true);
+    }
+    if (rel.isEmpty) return null;
+    var d = rel.sublist(0, rel.length - 1);
+    if (inCat && d.isNotEmpty) d = d.sublist(1);
+    final artist =
+        d.length >= 2 ? d[d.length - 2] : (d.length == 1 ? d[0] : _clean(v.artist));
+    return MovePlan(rel, [dest, artist, rel.last], isDir: false);
+  }
+
+  static bool _same(List<String> a, List<String> b) =>
+      a.length == b.length && [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((x) => x);
+
+  /// ¿[segs] está dentro de (o es) [prefix]?
+  static bool isUnder(List<String> prefix, List<String> segs) =>
+      segs.length >= prefix.length && _same(prefix, segs.sublist(0, prefix.length));
+
+  /// Ejecuta el movimiento: crea las carpetas que falten y mueve (sin sobrescribir).
+  Future<void> execute(MovePlan p) async {
+    if (_same(p.from, p.to)) throw const KoofrException('Ya está en esa carpeta');
+    for (var i = 1; i < p.to.length; i++) {
+      await _mkcol(_under(p.to.sublist(0, i), dir: true));
+    }
+    await _move(_under(p.from, dir: p.isDir), _under(p.to, dir: p.isDir));
+  }
+
+  Never _fail(int code) {
+    switch (code) {
+      case 401:
+      case 403:
+        throw const KoofrException('Sin permiso de escritura en Koofr (revisa la contraseña de aplicación)');
+      case 404:
+        throw const KoofrException('No se encontró el origen en Koofr');
+      case 409:
+        throw const KoofrException('Falta una carpeta en el destino');
+      case 412:
+        throw const KoofrException('Ya existe en el destino; no se sobrescribe');
+      default:
+        throw KoofrException('Error de Koofr ($code)');
+    }
+  }
+
+  Future<void> _mkcol(Uri u) async {
+    final req = http.Request('MKCOL', u)..headers.addAll(settings.headers);
+    final res = await http.Response.fromStream(await _http.send(req));
+    // 405 = la carpeta ya existe (correcto).
+    if (res.statusCode == 200 || res.statusCode == 201 || res.statusCode == 405) return;
+    _fail(res.statusCode);
+  }
+
+  Future<void> _move(Uri from, Uri to) async {
+    final req = http.Request('MOVE', from)
+      ..headers.addAll({
+        ...settings.headers,
+        'Destination': to.toString(),
+        'Overwrite': 'F',
+      });
+    final res = await http.Response.fromStream(await _http.send(req));
+    if (res.statusCode == 200 || res.statusCode == 201 || res.statusCode == 204) return;
+    _fail(res.statusCode);
+  }
 
   Map<String, Vinyl> _reuse = const {};
 

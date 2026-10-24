@@ -39,6 +39,18 @@ class LibrarySync {
         : result.summary(min);
   }
 
+  /// Vuelve a leer una cuenta en segundo plano (por ejemplo, tras mover carpetas).
+  static Future<void> refresh(KoofrSettings a, VinylStore store) async {
+    busy.value = 'Actualizando ${a.name}…';
+    try {
+      await syncAccount(a, store, keepIfEmpty: true);
+    } catch (_) {
+      // Se conserva lo guardado.
+    } finally {
+      busy.value = null;
+    }
+  }
+
   /// Sincroniza todas las cuentas guardadas (al abrir la app).
   static Future<void> syncAll(VinylStore store) async {
     if (_running || KoofrAccounts.list.isEmpty) return;
