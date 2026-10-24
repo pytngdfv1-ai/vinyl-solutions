@@ -158,11 +158,14 @@ class KoofrClient {
       return MovePlan(dirs, [dest, artist, dirs.last], isDir: true);
     }
     if (rel.isEmpty) return null;
-    var d = rel.sublist(0, rel.length - 1);
-    if (inCat && d.isNotEmpty) d = d.sublist(1);
-    final artist =
-        d.length >= 2 ? d[d.length - 2] : (d.length == 1 ? d[0] : _clean(v.artist));
-    return MovePlan(rel, [dest, artist, rel.last], isDir: false);
+    // Tema suelto: se mueve la carpeta que lo contiene (la del disco), no solo el archivo.
+    final dirs = rel.sublist(0, rel.length - 1);
+    final d = inCat && dirs.isNotEmpty ? dirs.sublist(1) : dirs;
+    if (d.isEmpty) {
+      return MovePlan(rel, [dest, _clean(v.artist), rel.last], isDir: false);
+    }
+    if (d.length == 1) return MovePlan(dirs, [dest, d[0]], isDir: true);
+    return MovePlan(dirs, [dest, d[d.length - 2], d.last], isDir: true);
   }
 
   static bool _same(List<String> a, List<String> b) =>
