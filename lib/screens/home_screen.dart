@@ -160,14 +160,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSpacing: 20,
                   childAspectRatio: 0.92,
                   children: [
-                    if (widget.store.items.any((v) => v.cassette))
-                      _CrateTile(
-                        label: 'Covers',
-                        count: widget.store.items.where((v) => v.cassette).length,
-                        singles: true,
-                        covers: widget.store.items.where((v) => v.cassette).toList(),
-                        onTap: () => _push(CoversScreen(store: widget.store)),
-                      ),
                     for (final c in chests)
                       _CrateTile(
                         label: c.label,
@@ -175,6 +167,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         singles: c.singles,
                         covers: c.items,
                         onTap: () => _openChest(c),
+                      ),
+                    // Baúl de covers: siempre al final del menú.
+                    if (widget.store.items.any((v) => v.cassette))
+                      _CabinetTile(
+                        covers: widget.store.items.where((v) => v.cassette).toList()
+                          ..sort((a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase())),
+                        onTap: () => _push(CoversScreen(store: widget.store)),
                       ),
                   ],
                 ),
@@ -359,4 +358,138 @@ class _CratePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CratePainter old) => false;
+}
+
+
+/// Mueble de madera para cassettes (ranuras horizontales, 3 columnas):
+/// solo se ven los cassettes que hay; las demás ranuras quedan vacías.
+class _CabinetTile extends StatelessWidget {
+  const _CabinetTile({required this.covers, required this.onTap});
+
+  final List<Vinyl> covers;
+  final VoidCallback onTap;
+
+  static const _cols = 3;
+  static const _rows = 8;
+
+  static const _papers = <(Color, Color)>[
+    (Color(0xFFEFE6D2), Color(0xFF1B1B1B)),
+    (Color(0xFF16161A), Color(0xFFE8B84A)),
+    (Color(0xFF7FA3BF), Color(0xFF10202E)),
+    (Color(0xFFC4452F), Color(0xFFFFF2E0)),
+    (Color(0xFF1C2B4A), Color(0xFFF2F2F2)),
+    (Color(0xFFE8C14A), Color(0xFF1A1A1A)),
+    (Color(0xFF3F6B4A), Color(0xFFF4EFE3)),
+    (Color(0xFFD9D9D6), Color(0xFF2A2A2A)),
+  ];
+
+  Widget _slot(int i) {
+    final has = i < covers.length;
+    final v = has ? covers[i] : null;
+    final pair = has ? _papers[(v!.hue ~/ 45) % _papers.length] : null;
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 1.2, horizontal: 1.5),
+        decoration: BoxDecoration(
+          color: has ? const Color(0xFF111112) : const Color(0xFF2A1C12),
+          borderRadius: BorderRadius.circular(1.5),
+          border: Border(
+            bottom: BorderSide(color: has ? Colors.black : const Color(0xFFC79A66), width: 1.2),
+          ),
+        ),
+        child: has
+            ? Row(
+                children: [
+                  Container(width: 4, color: pair!.$1.withOpacity(0.9)),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 1.2, horizontal: 1.5),
+                      color: pair.$1,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.only(left: 3),
+                      child: Text(
+                        v!.artist.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        style: TextStyle(
+                          color: pair.$2,
+                          fontSize: 6.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(width: 4, color: const Color(0xFF2A2A2C)),
+                ],
+              )
+            : null,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            bottom: 26,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(3),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF9C6B3F), Color(0xFF6B4527)],
+                ),
+                boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 5, offset: Offset(0, 3))],
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                color: const Color(0xFF1A110B),
+                child: Row(
+                  children: [
+                    for (var c = 0; c < _cols; c++) ...[
+                      if (c > 0) Container(width: 3, color: const Color(0xFF8A5B33)),
+                      Expanded(
+                        child: Column(
+                          children: [for (var r = 0; r < _rows; r++) _slot(c * _rows + r)],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 0,
+            height: 36,
+            child: Container(
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBF2),
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Covers',
+                      style: TextStyle(
+                          color: Color(0xFF2B2118), fontWeight: FontWeight.w900, fontSize: 12)),
+                  Text('${covers.length} cassettes',
+                      style: const TextStyle(color: Color(0xFF6B5846), fontSize: 10)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

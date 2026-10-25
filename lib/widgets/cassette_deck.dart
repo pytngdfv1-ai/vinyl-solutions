@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../models/vinyl.dart';
 
-/// Reproductor de cassette en modo oscuro: carcasa de vidrio transparente,
-/// etiqueta blanca con "Tema – Artista", carretes que giran y teclas.
+/// Casetero en modo oscuro: tapa de vidrio y un cassette realista
+/// (carcasa transparente, etiqueta con renglones, carretes con dientes,
+/// cinta que pasa de un carrete al otro, rodillos y tornillos) más las
+/// teclas mecánicas REW / PLAY / PAUSE / F.F / EJECT.
 class CassetteDeck extends StatefulWidget {
   const CassetteDeck({
     super.key,
@@ -36,7 +38,7 @@ class CassetteDeck extends StatefulWidget {
 
 class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderStateMixin {
   late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(seconds: 3));
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
 
   @override
   void initState() {
@@ -61,134 +63,309 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final v = widget.vinyl;
     final n = math.max(1, v.tracks.length);
-    final overall = ((widget.trackIndex + widget.progress) / n).clamp(0.0, 1.0);
-    final sideB = widget.trackIndex >= (n / 2).ceil() && n > 1;
-    final tint = HSLColor.fromAHSL(1, v.hue % 360, 0.72, 0.55).toColor();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        LayoutBuilder(
-          builder: (context, c) {
-            final w = c.maxWidth;
-            final h = w * 0.62;
-            return SizedBox(
-              width: w,
-              height: h,
-              child: Stack(
+    final overall = ((widget.trackIndex + widget.progress) / n).clamp(0.0, 1.0).toDouble();
+    final sideB = n > 1 && widget.trackIndex >= (n / 2).ceil();
+    final tint = HSLColor.fromAHSL(1, v.hue % 360, 0.62, 0.5).toColor();
+    return LayoutBuilder(builder: (context, c) {
+      final w = c.maxWidth;
+      final cw = w * 0.84;
+      final ch = cw / 1.57; // proporción real de un cassette
+      return Container(
+        padding: EdgeInsets.fromLTRB(w * 0.04, w * 0.035, w * 0.04, w * 0.04),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(w * 0.04),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF34373A), Color(0xFF232527), Color(0xFF17181A)],
+          ),
+          border: Border.all(color: const Color(0xFF4A4D50), width: 1.2),
+          boxShadow: const [BoxShadow(color: Colors.black, blurRadius: 14, offset: Offset(0, 6))],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Franja superior: rejilla del parlante, LED y marca.
+            SizedBox(
+              height: w * 0.075,
+              child: Row(
                 children: [
-                  AnimatedBuilder(
-                    animation: _c,
-                    builder: (_, __) => CustomPaint(
-                      size: Size(w, h),
-                      painter: _CassettePainter(
-                        spin: _c.value * 2 * math.pi,
-                        overall: overall,
-                        tint: tint,
-                      ),
+                  _Screw(w * 0.03),
+                  SizedBox(width: w * 0.03),
+                  Expanded(
+                    child: CustomPaint(painter: _GrillePainter(), size: Size.infinite),
+                  ),
+                  SizedBox(width: w * 0.03),
+                  Text('STEREO',
+                      style: TextStyle(
+                          color: const Color(0xFF8C9094),
+                          fontSize: w * 0.026,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.w800)),
+                  SizedBox(width: w * 0.025),
+                  Container(
+                    width: w * 0.024,
+                    height: w * 0.024,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: widget.playing ? const Color(0xFF42F56B) : const Color(0xFF2A3A2E),
+                      boxShadow: widget.playing
+                          ? const [BoxShadow(color: Color(0xAA42F56B), blurRadius: 8)]
+                          : null,
                     ),
                   ),
-                  Positioned(
-                    left: w * 0.07,
-                    top: h * 0.075,
-                    width: w * 0.86,
-                    height: h * 0.27,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                  SizedBox(width: w * 0.03),
+                  _Screw(w * 0.03),
+                ],
+              ),
+            ),
+            SizedBox(height: w * 0.02),
+            // Bahía del cassette con tapa de vidrio.
+            Container(
+              padding: EdgeInsets.all(w * 0.03),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(w * 0.025),
+                color: const Color(0xFF070708),
+                border: Border.all(color: const Color(0xFF55585B), width: 1.4),
+                boxShadow: const [BoxShadow(color: Colors.black, blurRadius: 6, spreadRadius: -1)],
+              ),
+              child: SizedBox(
+                width: cw,
+                height: ch,
+                child: Stack(
+                  children: [
+                    AnimatedBuilder(
+                      animation: _c,
+                      builder: (_, __) => CustomPaint(
+                        size: Size(cw, ch),
+                        painter: _CassettePainter(
+                          spin: _c.value * 2 * math.pi,
+                          overall: overall,
+                          tint: tint,
+                        ),
+                      ),
+                    ),
+                    // Etiqueta escrita a mano.
+                    Positioned(
+                      left: cw * 0.11,
+                      top: ch * 0.075,
+                      width: cw * 0.78,
+                      height: ch * 0.25,
+                      child: Center(
                         child: Text(
                           widget.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: const Color(0xFF111111),
-                            fontWeight: FontWeight.w900,
-                            fontSize: w * 0.062,
+                            fontFamily: 'cursive',
+                            color: const Color(0xFF1F3C88),
+                            fontWeight: FontWeight.w700,
+                            fontSize: cw * 0.068,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: w * 0.085,
-                    top: h * 0.375,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: w * 0.015),
-                      color: const Color(0xFF222222),
-                      child: Text(
-                        sideB ? 'B' : 'A',
-                        style: TextStyle(
-                            color: tint, fontWeight: FontWeight.w900, fontSize: w * 0.05),
+                    Positioned(
+                      left: cw * 0.115,
+                      top: ch * 0.345,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: cw * 0.014),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1B1B1B),
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                        child: Text(
+                          sideB ? 'B' : 'A',
+                          style: TextStyle(
+                              color: const Color(0xFFF2F2F2),
+                              fontWeight: FontWeight.w900,
+                              fontSize: cw * 0.045),
+                        ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    right: w * 0.09,
-                    top: h * 0.4,
-                    child: Text(
-                      '${v.tracks.length} TEMAS',
-                      style: TextStyle(
-                          color: const Color(0xFF222222),
-                          fontWeight: FontWeight.w800,
-                          fontSize: w * 0.032),
+                    Positioned(
+                      right: cw * 0.12,
+                      top: ch * 0.355,
+                      child: Text(
+                        'NORMAL · ${v.tracks.length} T',
+                        style: TextStyle(
+                            color: const Color(0xFF3B3B3B),
+                            fontWeight: FontWeight.w800,
+                            fontSize: cw * 0.026),
+                      ),
                     ),
-                  ),
+                    // Reflejo del vidrio de la tapa.
+                    IgnorePointer(
+                      child: CustomPaint(size: Size(cw, ch), painter: _GlassPainter()),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: w * 0.035),
+            // Teclas mecánicas.
+            Container(
+              padding: EdgeInsets.fromLTRB(w * 0.02, w * 0.012, w * 0.02, w * 0.02),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B0B0C),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF3A3C3E)),
+              ),
+              child: Row(
+                children: [
+                  _Key('REW', Icons.fast_rewind, widget.onPrev),
+                  _Key('PLAY', Icons.play_arrow, widget.onPlay, pressed: widget.playing),
+                  _Key('PAUSE', Icons.pause, widget.onPause),
+                  _Key('F.F', Icons.fast_forward, widget.onNext),
+                  _Key('EJECT', Icons.eject, widget.onEject),
                 ],
               ),
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _Key('REW', Icons.fast_rewind, widget.onPrev),
-            _Key('PLAY', Icons.play_arrow, widget.onPlay, active: widget.playing),
-            _Key('PAUSE', Icons.pause, widget.onPause),
-            _Key('F.F', Icons.fast_forward, widget.onNext),
-            _Key('EJECT', Icons.eject, widget.onEject),
+            ),
           ],
         ),
-      ],
-    );
+      );
+    });
   }
 }
 
+class _Screw extends StatelessWidget {
+  const _Screw(this.d);
+  final double d;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: d,
+        height: d,
+        child: CustomPaint(painter: _ScrewPainter()),
+      );
+}
+
+class _ScrewPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2;
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.3, -0.3),
+          colors: [Color(0xFFB9BCC0), Color(0xFF5B5E62)],
+        ).createShader(Rect.fromCircle(center: c, radius: r)),
+    );
+    final slot = Paint()
+      ..color = const Color(0xFF1C1D1F)
+      ..strokeWidth = r * 0.28
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(c + Offset(-r * 0.6, r * 0.2), c + Offset(r * 0.6, -r * 0.2), slot);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class _GrillePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()..color = const Color(0xFF0A0A0B);
+    final hi = Paint()..color = const Color(0x22FFFFFF);
+    const step = 7.0;
+    for (var y = step / 2; y < s.height; y += step) {
+      for (var x = step / 2; x < s.width; x += step) {
+        canvas.drawCircle(Offset(x, y + 0.6), 1.5, hi);
+        canvas.drawCircle(Offset(x, y), 1.5, p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
 class _Key extends StatelessWidget {
-  const _Key(this.label, this.icon, this.onTap, {this.active = false});
+  const _Key(this.label, this.icon, this.onTap, {this.pressed = false});
 
   final String label;
   final IconData icon;
   final VoidCallback? onTap;
-  final bool active;
+  final bool pressed;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 46,
-            decoration: BoxDecoration(
-              color: active ? const Color(0xFFD8CDB6) : const Color(0xFFE9E0CC),
-              borderRadius: BorderRadius.circular(4),
-              boxShadow: const [BoxShadow(color: Colors.black87, offset: Offset(0, 3))],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 18, color: const Color(0xFF3A3328)),
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 8, color: Color(0xFF3A3328), fontWeight: FontWeight.w700)),
-              ],
-            ),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2.5),
+          child: Column(
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 8.5,
+                      letterSpacing: 0.6,
+                      color: Color(0xFF9A9EA2),
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                height: 46,
+                margin: EdgeInsets.only(top: pressed ? 4 : 0),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: pressed
+                        ? const [Color(0xFF3A3C3F), Color(0xFF2A2B2D)]
+                        : const [Color(0xFF6A6D71), Color(0xFF3F4144)],
+                  ),
+                  border: Border.all(color: const Color(0xFF16171A)),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black,
+                        offset: Offset(0, pressed ? 1 : 4),
+                        blurRadius: pressed ? 1 : 2),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(icon,
+                      size: 20,
+                      color: pressed ? const Color(0xFF7CF59A) : const Color(0xFFD4D6D9)),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Vidrio de la tapa: brillo diagonal y borde.
+class _GlassPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final shine = Path()
+      ..moveTo(s.width * 0.05, 0)
+      ..lineTo(s.width * 0.30, 0)
+      ..lineTo(s.width * 0.08, s.height)
+      ..lineTo(0, s.height)
+      ..lineTo(0, s.height * 0.4)
+      ..close();
+    canvas.drawPath(shine, Paint()..color = const Color(0x10FFFFFF));
+    final shine2 = Path()
+      ..moveTo(s.width * 0.36, 0)
+      ..lineTo(s.width * 0.42, 0)
+      ..lineTo(s.width * 0.2, s.height)
+      ..lineTo(s.width * 0.14, s.height)
+      ..close();
+    canvas.drawPath(shine2, Paint()..color = const Color(0x0AFFFFFF));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
 class _CassettePainter extends CustomPainter {
@@ -202,108 +379,234 @@ class _CassettePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    final body = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.04));
+    final shell = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.03));
 
-    // Carcasa de vidrio ahumado.
+    // --- Carcasa: plástico transparente ahumado ---
     canvas.drawRRect(
-      body,
+      shell,
       Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0x40FFFFFF), Color(0x14FFFFFF), Color(0x30FFFFFF)],
+          colors: [Color(0xFF3C3E41), Color(0xFF232426), Color(0xFF2E3033)],
         ).createShader(Rect.fromLTWH(0, 0, w, h)),
     );
     canvas.drawRRect(
-      body,
+      shell.deflate(w * 0.008),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = const Color(0x88FFFFFF),
+        ..strokeWidth = 1
+        ..color = const Color(0x44FFFFFF),
+    );
+    canvas.drawRRect(
+      shell,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = const Color(0x99B8BCC2),
     );
 
-    // Etiqueta blanca.
-    final label = RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.07, h * 0.075, w * 0.86, h * 0.27), const Radius.circular(5));
-    canvas.drawRRect(label, Paint()..color = const Color(0xFFF7F3EA));
-
-    // Franja de color (toma el tono del disco), un poco transparente.
-    final strip = Rect.fromLTWH(w * 0.07, h * 0.345, w * 0.86, h * 0.43);
-    canvas.drawRect(strip, Paint()..color = tint.withOpacity(0.88));
-
-    // Ventana oscura con los carretes.
-    final win = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(w * 0.5, h * 0.56), width: w * 0.68, height: h * 0.26),
-        Radius.circular(h * 0.13));
-    canvas.drawRRect(win, Paint()..color = const Color(0xCC0B0B0B));
-
-    final rMax = h * 0.115;
-    final rMin = h * 0.065;
-    final left = rMax - (rMax - rMin) * overall; // se vacía
-    final right = rMin + (rMax - rMin) * overall; // se llena
-    _reel(canvas, Offset(w * 0.3, h * 0.56), left, h * 0.062, spin);
-    _reel(canvas, Offset(w * 0.7, h * 0.56), right, h * 0.062, spin);
-
-    // Cinta visible entre carretes.
-    canvas.drawRect(
-      Rect.fromLTWH(w * 0.4, h * 0.545, w * 0.2, h * 0.03),
-      Paint()..color = const Color(0x99F0E6D0),
+    // --- Etiqueta de papel con renglones y borde superior recortado ---
+    final lab = Rect.fromLTWH(w * 0.075, h * 0.05, w * 0.85, h * 0.29);
+    final labPath = Path()
+      ..addRRect(RRect.fromRectAndCorners(
+        lab,
+        topLeft: Radius.circular(w * 0.03),
+        topRight: Radius.circular(w * 0.03),
+        bottomLeft: const Radius.circular(1),
+        bottomRight: const Radius.circular(1),
+      ));
+    canvas.drawPath(
+      labPath,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFCFAF4), Color(0xFFE9E4D6)],
+        ).createShader(lab),
     );
-
-    // Parte baja (trapecio) con orificios.
-    final low = Path()
-      ..moveTo(w * 0.14, h * 0.78)
-      ..lineTo(w * 0.86, h * 0.78)
-      ..lineTo(w * 0.93, h * 0.96)
-      ..lineTo(w * 0.07, h * 0.96)
-      ..close();
-    canvas.drawPath(low, Paint()..color = const Color(0x55000000));
-    final hole = Paint()..color = const Color(0xFFEDEDED);
-    canvas.drawCircle(Offset(w * 0.2, h * 0.88), w * 0.022, hole);
-    canvas.drawCircle(Offset(w * 0.8, h * 0.88), w * 0.022, hole);
-    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.34, h * 0.86), width: w * 0.03, height: w * 0.03), hole);
-    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.66, h * 0.86), width: w * 0.03, height: w * 0.03), hole);
-
-    // Tornillos.
-    final screw = Paint()..color = const Color(0xCCDDDDDD);
-    for (final p in [
-      Offset(w * 0.035, h * 0.05),
-      Offset(w * 0.965, h * 0.05),
-      Offset(w * 0.035, h * 0.95),
-      Offset(w * 0.965, h * 0.95),
-    ]) {
-      canvas.drawCircle(p, w * 0.012, screw);
+    final rule = Paint()
+      ..color = const Color(0x553B63C4)
+      ..strokeWidth = 0.7;
+    for (var i = 1; i <= 3; i++) {
+      final y = lab.top + lab.height * (0.28 + i * 0.2);
+      canvas.drawLine(Offset(lab.left + 6, y), Offset(lab.right - 6, y), rule);
     }
+    canvas.drawLine(
+      Offset(lab.left + w * 0.08, lab.top),
+      Offset(lab.left + w * 0.08, lab.bottom),
+      Paint()
+        ..color = const Color(0x55D8453C)
+        ..strokeWidth = 0.8,
+    );
+    // Franja de color bajo la etiqueta.
+    final band = Rect.fromLTWH(lab.left, lab.bottom, lab.width, h * 0.055);
+    canvas.drawRect(band, Paint()..color = tint);
+    canvas.drawRect(
+        Rect.fromLTWH(band.left, band.top, band.width, band.height * 0.35),
+        Paint()..color = const Color(0x33FFFFFF));
 
-    // Brillo de vidrio.
-    final shine = Path()
-      ..moveTo(w * 0.1, 0)
-      ..lineTo(w * 0.3, 0)
-      ..lineTo(w * 0.12, h)
-      ..lineTo(0, h)
-      ..close();
+    // --- Ventana del carrete y cinta ---
+    final win = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.11, h * 0.43, w * 0.78, h * 0.37),
+      Radius.circular(h * 0.185),
+    );
+    canvas.drawRRect(win, Paint()..color = const Color(0xFF050506));
     canvas.save();
-    canvas.clipRRect(body);
-    canvas.drawPath(shine, Paint()..color = const Color(0x12FFFFFF));
-    canvas.restore();
-  }
+    canvas.clipRRect(win);
 
-  void _reel(Canvas canvas, Offset c, double tape, double hub, double a) {
-    canvas.drawCircle(c, tape, Paint()..color = const Color(0xFF3B2A1E)); // cinta enrollada
-    canvas.drawCircle(c, hub, Paint()..color = const Color(0xFFEFEFEF));
-    canvas.drawCircle(c, hub * 0.72, Paint()..color = const Color(0xFF151515));
-    final tooth = Paint()
-      ..color = const Color(0xFFEFEFEF)
-      ..strokeWidth = hub * 0.2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 6; i++) {
-      final ang = a + i * math.pi / 3;
-      canvas.drawLine(
-        c + Offset(math.cos(ang), math.sin(ang)) * hub * 0.35,
-        c + Offset(math.cos(ang), math.sin(ang)) * hub * 0.68,
-        tooth,
+    final rHub = h * 0.092;
+    final rMin = h * 0.115;
+    final rMax = h * 0.205;
+    final cy = h * 0.615;
+    final lx = w * 0.30;
+    final rx = w * 0.70;
+    final leftTape = rMax - (rMax - rMin) * overall; // se vacía
+    final rightTape = rMin + (rMax - rMin) * overall; // se llena
+
+    for (final e in [(Offset(lx, cy), leftTape), (Offset(rx, cy), rightTape)]) {
+      final c = e.$1;
+      final r = e.$2;
+      // Cinta enrollada marrón con brillo.
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..shader = RadialGradient(
+            colors: const [Color(0xFF6B4A33), Color(0xFF3A2619), Color(0xFF52382A)],
+            stops: const [0.5, 0.9, 1.0],
+          ).createShader(Rect.fromCircle(center: c, radius: r)),
+      );
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0x33FFFFFF),
       );
     }
+    // Cinta entre los carretes y hacia los rodillos de abajo.
+    final tapePaint = Paint()
+      ..color = const Color(0xFF5A3F2D)
+      ..strokeWidth = h * 0.012;
+    canvas.drawLine(Offset(lx - leftTape * 0.2, cy + leftTape), Offset(w * 0.17, h * 0.92), tapePaint);
+    canvas.drawLine(Offset(rx + rightTape * 0.2, cy + rightTape), Offset(w * 0.83, h * 0.92), tapePaint);
+    canvas.restore();
+
+    // Carretes (aro blanco con 6 dientes hacia adentro).
+    _hub(canvas, Offset(lx, cy), rHub, spin);
+    _hub(canvas, Offset(rx, cy), rHub, spin * 1.0);
+
+    // Ventanilla central con marcas del contador.
+    final mid = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(w * 0.5, cy), width: w * 0.17, height: h * 0.15),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(mid, Paint()..color = const Color(0xFF0C0C0D));
+    canvas.drawRRect(
+      mid,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0x66FFFFFF),
+    );
+    // Cinta visible: franja clara cuyo ancho sigue el avance.
+    canvas.drawRect(
+      Rect.fromCenter(center: Offset(w * 0.5, cy), width: w * 0.15, height: h * 0.05),
+      Paint()..color = const Color(0xFF6D4C37),
+    );
+    final tick = Paint()
+      ..color = const Color(0x88FFFFFF)
+      ..strokeWidth = 0.7;
+    for (var i = 0; i <= 8; i++) {
+      final x = w * 0.5 - w * 0.075 + i * (w * 0.15 / 8);
+      canvas.drawLine(Offset(x, cy + h * 0.055), Offset(x, cy + h * (i.isEven ? 0.072 : 0.065)), tick);
+    }
+    canvas.drawCircle(
+      Offset(w * 0.5 - w * 0.075 + overall * w * 0.15, cy + h * 0.015),
+      h * 0.012,
+      Paint()..color = const Color(0xFFFFE08A),
+    );
+
+    // --- Parte baja: trapecio con rodillos y cabezal ---
+    final low = Path()
+      ..moveTo(w * 0.17, h * 0.80)
+      ..lineTo(w * 0.83, h * 0.80)
+      ..lineTo(w * 0.90, h * 0.985)
+      ..lineTo(w * 0.10, h * 0.985)
+      ..close();
+    canvas.drawPath(
+      low,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF17181A), Color(0xFF0C0C0D)],
+        ).createShader(Rect.fromLTWH(0, h * 0.8, w, h * 0.2)),
+    );
+    canvas.drawPath(
+      low,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0x55FFFFFF),
+    );
+    final metal = Paint()..color = const Color(0xFFC5C8CC);
+    final hole = Paint()..color = const Color(0xFF000000);
+    // Rodillos guía (con cinta pasando).
+    for (final x in [w * 0.17, w * 0.83]) {
+      canvas.drawCircle(Offset(x, h * 0.92), h * 0.04, metal);
+      canvas.drawCircle(Offset(x, h * 0.92), h * 0.018, hole);
+    }
+    // Orificios del cabezal y cabrestante.
+    canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036, hole);
+    canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0x66FFFFFF));
+    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.34, h * 0.885), width: w * 0.032, height: h * 0.05), hole);
+    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.66, h * 0.885), width: w * 0.032, height: h * 0.05), hole);
+    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.5, h * 0.82), width: w * 0.06, height: h * 0.03),
+        Paint()..color = const Color(0xFF8A6A3C)); // almohadilla de presión
+
+    // --- Tornillos (5, como el cassette real) ---
+    for (final p in [
+      Offset(w * 0.035, h * 0.055),
+      Offset(w * 0.965, h * 0.055),
+      Offset(w * 0.035, h * 0.945),
+      Offset(w * 0.965, h * 0.945),
+      Offset(w * 0.5, h * 0.36),
+    ]) {
+      canvas.save();
+      canvas.translate(p.dx - w * 0.011, p.dy - w * 0.011);
+      _ScrewPainter().paint(canvas, Size(w * 0.022, w * 0.022));
+      canvas.restore();
+    }
+  }
+
+  void _hub(Canvas canvas, Offset c, double r, double a) {
+    canvas.drawCircle(c, r, Paint()..color = const Color(0xFFF1F1EE));
+    canvas.drawCircle(c, r * 0.72, Paint()..color = const Color(0xFF111112));
+    final tooth = Paint()
+      ..color = const Color(0xFFF1F1EE)
+      ..strokeWidth = r * 0.2
+      ..strokeCap = StrokeCap.butt;
+    for (var i = 0; i < 6; i++) {
+      final ang = a + i * math.pi / 3;
+      final p1 = c + Offset(math.cos(ang), math.sin(ang)) * r * 0.42;
+      final p2 = c + Offset(math.cos(ang), math.sin(ang)) * r * 0.76;
+      canvas.drawLine(p1, p2, tooth);
+    }
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..color = const Color(0x66000000),
+    );
   }
 
   @override

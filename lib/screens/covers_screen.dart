@@ -13,7 +13,7 @@ class CoversScreen extends StatelessWidget {
 
   final VinylStore store;
 
-  static const _perRow = 7;
+  static const _perRow = 12;
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +107,7 @@ class _Shelf extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 150,
+            height: 168,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -115,7 +115,7 @@ class _Shelf extends StatelessWidget {
                   Expanded(
                     child: i < items.length
                         ? Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 0.6),
                             child: _Spine(vinyl: items[i], onTap: () => onTap(items[i])),
                           )
                         : const SizedBox.shrink(),
@@ -141,44 +141,73 @@ class _Shelf extends StatelessWidget {
   }
 }
 
-/// Lomo de cassette: color según el disco y "Artista – Tema" en vertical.
+/// Lomo de cassette real: plástico negro, papel de color con el nombre
+/// en vertical y las marcas "STEREO" abajo. Delgado, como en la estantería.
 class _Spine extends StatelessWidget {
   const _Spine({required this.vinyl, required this.onTap});
 
   final Vinyl vinyl;
   final VoidCallback onTap;
 
+  // (papel, tinta) como los lomos de verdad.
+  static const _papers = <(Color, Color)>[
+    (Color(0xFFEFE6D2), Color(0xFF1B1B1B)),
+    (Color(0xFF16161A), Color(0xFFE8B84A)),
+    (Color(0xFF7FA3BF), Color(0xFF10202E)),
+    (Color(0xFFC4452F), Color(0xFFFFF2E0)),
+    (Color(0xFF1C2B4A), Color(0xFFF2F2F2)),
+    (Color(0xFFE8C14A), Color(0xFF1A1A1A)),
+    (Color(0xFF3F6B4A), Color(0xFFF4EFE3)),
+    (Color(0xFFD9D9D6), Color(0xFF2A2A2A)),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final tint = HSLColor.fromAHSL(1, vinyl.hue % 360, 0.55, 0.42).toColor();
+    final pair = _papers[(vinyl.hue ~/ 45) % _papers.length];
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1B1B1B),
-          borderRadius: BorderRadius.circular(2),
-          border: Border.all(color: Colors.white24, width: 0.6),
+          borderRadius: BorderRadius.circular(1.5),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2A2A2C), Color(0xFF0E0E0F), Color(0xFF1C1C1E)],
+          ),
+          border: Border.all(color: const Color(0x33FFFFFF), width: 0.5),
         ),
         child: Column(
           children: [
-            Container(height: 6, color: tint),
+            // Marca arriba (logo de la casetera).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(3, 4, 3, 3),
+              child: Container(height: 5, decoration: BoxDecoration(color: pair.$1.withOpacity(0.85), borderRadius: BorderRadius.circular(1))),
+            ),
             Expanded(
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 3),
-                color: const Color(0xFFF4EFE3),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: pair.$1,
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.lerp(pair.$1, Colors.white, 0.12)!,
+                      pair.$1,
+                      Color.lerp(pair.$1, Colors.black, 0.18)!,
+                    ],
+                  ),
+                ),
                 child: RotatedBox(
                   quarterTurns: 3,
                   child: Center(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: Text(
-                        '${vinyl.artist} – ${_name(vinyl)}',
+                        '${vinyl.artist} – ${_name(vinyl)}'.toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF1A1A1A),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10.5,
+                        style: TextStyle(
+                          color: pair.$2,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 9.5,
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ),
@@ -186,7 +215,12 @@ class _Spine extends StatelessWidget {
                 ),
               ),
             ),
-            Container(height: 6, color: tint),
+            // Rayitas de "STEREO" y el icono del cassette abajo.
+            const SizedBox(height: 3),
+            Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 3), color: Colors.white24),
+            const SizedBox(height: 2),
+            Container(height: 4, width: 8, decoration: BoxDecoration(border: Border.all(color: Colors.white38, width: 0.6))),
+            const SizedBox(height: 4),
           ],
         ),
       ),
