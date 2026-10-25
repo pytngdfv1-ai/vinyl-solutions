@@ -449,7 +449,7 @@ class _Back extends StatelessWidget {
     final hand = vinyl.cassette;
     const ink = Color(0xFF1F3C88);
     final base = hand
-        ? const TextStyle(fontFamily: 'cursive', color: ink, fontWeight: FontWeight.w700, fontSize: 20)
+        ? const TextStyle(fontFamily: 'cursive', color: ink, fontWeight: FontWeight.w700, fontSize: 15)
         : null;
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
@@ -462,12 +462,12 @@ class _Back extends StatelessWidget {
             Text(
               hand ? vinyl.artist : vinyl.artist.toUpperCase(),
               style: hand
-                  ? base!.copyWith(fontSize: 26)
+                  ? base!.copyWith(fontSize: 19)
                   : const TextStyle(letterSpacing: 1.4, fontWeight: FontWeight.w700),
             ),
             Text(
               vinyl.title,
-              style: hand ? base!.copyWith(fontWeight: FontWeight.w500) : const TextStyle(color: Colors.white70),
+              style: hand ? base!.copyWith(fontWeight: FontWeight.w500, fontSize: 14) : const TextStyle(color: Colors.white70),
             ),
             Divider(height: 20, color: hand ? const Color(0x663B63C4) : null),
             Expanded(
@@ -477,7 +477,7 @@ class _Back extends StatelessWidget {
                 itemBuilder: (_, i) => InkWell(
                   onTap: () => onTrack(i),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    padding: const EdgeInsets.symmetric(vertical: 3),
                     decoration: hand
                         ? const BoxDecoration(
                             border: Border(bottom: BorderSide(color: Color(0x553B63C4), width: 0.8)))
