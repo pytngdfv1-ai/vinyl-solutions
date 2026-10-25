@@ -445,29 +445,44 @@ class _Back extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Covers: hoja como la etiqueta del cassette, con letra a mano alzada.
+    final hand = vinyl.cassette;
+    const ink = Color(0xFF1F3C88);
+    final base = hand
+        ? const TextStyle(fontFamily: 'cursive', color: ink, fontWeight: FontWeight.w700, fontSize: 20)
+        : null;
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
       child: Container(
-        color: hueColor(vinyl.hue, 0.25, 0.12),
+        color: hand ? const Color(0xFFF7F3EA) : hueColor(vinyl.hue, 0.25, 0.12),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              vinyl.artist.toUpperCase(),
-              style: const TextStyle(letterSpacing: 1.4, fontWeight: FontWeight.w700),
+              hand ? vinyl.artist : vinyl.artist.toUpperCase(),
+              style: hand
+                  ? base!.copyWith(fontSize: 26)
+                  : const TextStyle(letterSpacing: 1.4, fontWeight: FontWeight.w700),
             ),
-            Text(vinyl.title, style: const TextStyle(color: Colors.white70)),
-            const Divider(height: 20),
+            Text(
+              vinyl.title,
+              style: hand ? base!.copyWith(fontWeight: FontWeight.w500) : const TextStyle(color: Colors.white70),
+            ),
+            Divider(height: 20, color: hand ? const Color(0x663B63C4) : null),
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 itemCount: vinyl.tracks.length,
                 itemBuilder: (_, i) => InkWell(
                   onTap: () => onTrack(i),
-                  child: Padding(
+                  child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: Text('${i + 1}.  ${vinyl.tracks[i]}'),
+                    decoration: hand
+                        ? const BoxDecoration(
+                            border: Border(bottom: BorderSide(color: Color(0x553B63C4), width: 0.8)))
+                        : null,
+                    child: Text('${i + 1}.  ${vinyl.tracks[i]}', style: base),
                   ),
                 ),
               ),
@@ -508,12 +523,16 @@ class DetailSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  v.artist.toUpperCase(),
-                  style: const TextStyle(color: Colors.white60, letterSpacing: 1.4),
+                  v.cassette ? v.artist : v.artist.toUpperCase(),
+                  style: v.cassette
+                      ? const TextStyle(fontFamily: 'cursive', color: Color(0xFF9DB8FF), fontSize: 20, fontWeight: FontWeight.w700)
+                      : const TextStyle(color: Colors.white60, letterSpacing: 1.4),
                 ),
                 Text(
                   v.title,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                  style: v.cassette
+                      ? const TextStyle(fontFamily: 'cursive', color: Color(0xFFBFD0FF), fontSize: 28, fontWeight: FontWeight.w700)
+                      : const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                 ),
                 Text(v.yearLabel, style: const TextStyle(color: Colors.white60)),
                 const SizedBox(height: 14),
@@ -598,7 +617,12 @@ class DetailSheet extends StatelessWidget {
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       leading: Text('${i + 1}'),
-                      title: Text(v.tracks[i]),
+                      title: Text(
+                        v.tracks[i],
+                        style: v.cassette
+                            ? const TextStyle(fontFamily: 'cursive', color: Color(0xFFBFD0FF), fontSize: 18, fontWeight: FontWeight.w700)
+                            : null,
+                      ),
                     ),
                   ),
                 ),
