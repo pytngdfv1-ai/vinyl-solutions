@@ -9,7 +9,16 @@ import '../models/vinyl.dart';
 
 /// "Mover a…": mueve el álbum o tema a otra carpeta de la nube (sin borrar ni sobrescribir).
 class MoveDialog extends StatefulWidget {
-  const MoveDialog({super.key, required this.store, required this.vinyl, required this.account});
+  const MoveDialog({
+    super.key,
+    required this.store,
+    required this.vinyl,
+    required this.account,
+    this.initial,
+  });
+
+  /// Carpeta de destino preseleccionada (si existe).
+  final String? initial;
 
   final VinylStore store;
   final Vinyl vinyl;
@@ -45,7 +54,12 @@ class _MoveDialogState extends State<MoveDialog> {
   Future<void> _load() async {
     try {
       final f = await _client.topFolders();
-      if (mounted) setState(() => _folders = f);
+      if (mounted) {
+        setState(() {
+          _folders = f;
+          if (widget.initial != null && f.contains(widget.initial)) _selected = widget.initial;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'No se pudieron leer las carpetas: $e');
     }

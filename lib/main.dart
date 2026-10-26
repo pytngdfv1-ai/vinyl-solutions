@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/cajon.dart';
 import 'data/koofr_settings.dart';
 import 'data/library_settings.dart';
 import 'data/library_sync.dart';
@@ -11,6 +12,7 @@ Future<void> main() async {
   final store = VinylStore();
   await store.load();
   await LibrarySettings.load();
+  await ChestNames.load();
   await KoofrAccounts.load();
   runApp(VinylApp(store: store));
   // Sincroniza las nubes al abrir (en segundo plano).
