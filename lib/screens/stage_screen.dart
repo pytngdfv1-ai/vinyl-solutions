@@ -15,6 +15,7 @@ import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
 import 'booklet_screen.dart';
+import 'lyrics_sheet.dart';
 import 'move_dialog.dart';
 
 /// Disco sacado de la caja: tornamesa arriba, carátula abajo.
@@ -208,6 +209,16 @@ class _StageScreenState extends State<StageScreen> {
                         MaterialPageRoute<void>(builder: (_) => BookletScreen(vinyl: v)),
                       ),
                     ),
+                  IconButton(
+                    tooltip: 'Letra',
+                    icon: const Icon(Icons.lyrics_outlined),
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: const Color(0xFF161816),
+                      builder: (_) => LyricsSheet(store: widget.store, vinyl: v),
+                    ),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.info_outline),
                     onPressed: () => showModalBottomSheet<void>(

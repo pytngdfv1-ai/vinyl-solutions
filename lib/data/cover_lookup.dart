@@ -2,11 +2,17 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'discogs.dart';
+import 'musicbrainz.dart';
+
 /// Portada encontrada y año de lanzamiento (0 = desconocido).
 class CoverHit {
-  const CoverHit(this.url, this.year);
+  const CoverHit(this.url, this.year, {this.lang});
   final String url;
   final int year;
+
+  /// Idioma si la fuente lo indica (MusicBrainz): 'en' | 'es'.
+  final String? lang;
 }
 
 int _yr(Object? s) {
@@ -15,12 +21,11 @@ int _yr(Object? s) {
 }
 
 /// Busca la portada del álbum (o del lanzamiento del cover) en internet.
-/// Orden: iTunes (álbum) → Deezer (álbum) → Cover Art Archive → iTunes (tema)
-/// → Deezer (tema). Siempre exige que el artista sea quien interpreta el
+/// Orden: MusicBrainz + Cover Art Archive → iTunes → Deezer → Discogs (solo con
+/// tu token) y, por último, la portada del tema. Siempre exige que el artista sea quien interpreta el
 /// disco, para no traer la portada del tema original de otro artista.
 class CoverLookup {
   static final http.Client _client = http.Client();
-  static const _ua = {'User-Agent': 'VinylSolutions/1.0 (personal music library app)'};
 
   static Future<CoverHit?> find({
     required String artist,
@@ -38,6 +43,10 @@ class CoverLookup {
     }
     Future<CoverHit?> byAlbums() async {
       for (final n in names) {
+        final r = await _coverArtArchive(artist, n);
+        if (r != null) return r;
+      }
+      for (final n in names) {
         final r = await _itunesAlbum(artist, n);
         if (r != null) return r;
       }
@@ -45,9 +54,11 @@ class CoverLookup {
         final r = await _deezerAlbum(artist, n);
         if (r != null) return r;
       }
-      for (final n in names) {
-        final r = await _coverArtArchive(artist, n);
-        if (r != null) return r;
+      if (Discogs.enabled) {
+        for (final n in names) {
+          final d = await Discogs.album(artist, n);
+          if (d != null) return CoverHit(d.url, d.year);
+        }
       }
       return null;
     }
@@ -176,29 +187,9 @@ class CoverLookup {
   }
 
   static Future<CoverHit?> _coverArtArchive(String artist, String album) async {
-    final j = await _json(
-      Uri.https('musicbrainz.org', '/ws/2/release/', {
-        'query': 'release:"$album" AND artist:"$artist"',
-        'fmt': 'json',
-        'limit': '5',
-      }),
-      headers: _ua,
-    );
-    if (j is! Map) return null;
-    for (final r in (j['releases'] as List? ?? const [])) {
-      if (r is! Map) continue;
-      final credits = (r['artist-credit'] as List? ?? const []);
-      final okArtist = credits.any((c) => c is Map && _same(c['name'] as String? ?? '', artist));
-      if (!okArtist || !_same(r['title'] as String? ?? '', album)) continue;
-      final url = 'https://coverartarchive.org/release/${r['id']}/front-500';
-      try {
-        final res = await _client
-            .send(http.Request('HEAD', Uri.parse(url))..headers.addAll(_ua))
-            .timeout(const Duration(seconds: 8));
-        await res.stream.drain<void>();
-        if (res.statusCode == 200) return CoverHit(url, _yr(r['date']));
-      } catch (_) {}
-    }
-    return null;
+    final r = await MusicBrainz.release(artist, album);
+    if (r == null) return null;
+    final url = await MusicBrainz.frontCover(r);
+    return url == null ? null : CoverHit(url, r.year, lang: r.lang);
   }
 }

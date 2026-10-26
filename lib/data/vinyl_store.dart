@@ -264,6 +264,15 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Idioma deducido automáticamente (p. ej. de la letra). No toca lo fijado a mano.
+  Future<void> setAutoLang(String id, String lang) async {
+    final cur = _items.where((v) => v.id == id).firstOrNull;
+    if (cur == null || cur.langManual || cur.lang != null) return;
+    _items = [for (final v in _items) v.id == id ? v.copyWith(lang: lang) : v];
+    notifyListeners();
+    await _save();
+  }
+
   /// Clasifica en segundo plano lo que aún no tiene idioma (sin bloquear la interfaz)
   /// y detecta covers por el nombre. Nunca toca lo corregido a mano.
   Future<void> reclassify() async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../audio/player_service.dart';
+import '../data/discogs.dart';
 import '../data/library_settings.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
@@ -28,6 +29,7 @@ Future<void> addDisc(BuildContext context, VinylStore store) async {
 
 Future<void> showLibrarySettings(BuildContext context) async {
   var value = LibrarySettings.minTracks.toDouble();
+  final token = TextEditingController(text: Discogs.token);
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => StatefulBuilder(
@@ -52,6 +54,16 @@ Future<void> showLibrarySettings(BuildContext context) async {
               label: '${value.round()}',
               onChanged: (v) => setLocal(() => value = v),
             ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: token,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Token de Discogs (opcional)',
+                helperText: 'Solo para buscar más portadas. Se guarda cifrado en el teléfono.',
+                helperMaxLines: 2,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -67,7 +79,11 @@ Future<void> showLibrarySettings(BuildContext context) async {
       ),
     ),
   );
-  if (ok == true) await LibrarySettings.save(value.round());
+  if (ok == true) {
+    await LibrarySettings.save(value.round());
+    await Discogs.save(token.text);
+  }
+  token.dispose();
 }
 
 Future<void> confirmClearLibrary(BuildContext context, VinylStore store) async {
