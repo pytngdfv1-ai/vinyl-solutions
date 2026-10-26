@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/booklet_lite.dart';
 import 'data/cajon.dart';
 import 'data/discogs.dart';
 import 'data/koofr_settings.dart';
@@ -7,6 +8,7 @@ import 'data/library_settings.dart';
 import 'data/library_sync.dart';
 import 'data/vinyl_store.dart';
 import 'screens/home_screen.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +17,7 @@ Future<void> main() async {
   await LibrarySettings.load();
   await ChestNames.load();
   await Discogs.load();
+  await BookletLite.load();
   await KoofrAccounts.load();
   runApp(VinylApp(store: store));
   // Sincroniza las nubes al abrir (en segundo plano).
@@ -31,11 +34,7 @@ class VinylApp extends StatelessWidget {
     return MaterialApp(
       title: 'VinylSolutions',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: const Color(0xFFE53935),
-      ),
+      theme: buildAppTheme(),
       home: HomeScreen(store: store),
     );
   }

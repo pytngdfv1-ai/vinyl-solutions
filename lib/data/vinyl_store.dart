@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/vinyl.dart';
+import 'booklet_lite.dart';
 import 'classifier.dart';
 import 'library_order.dart';
 
@@ -193,6 +194,7 @@ class VinylStore extends ChangeNotifier {
     _items = [...fresh, ...others];
     notifyListeners();
     await _save();
+    unawaited(BookletLite.autoConvert(() => _items));
   }
 
   Future<void> removeAccount(String accountId) async {
@@ -214,6 +216,7 @@ class VinylStore extends ChangeNotifier {
     ];
     notifyListeners();
     await _save();
+    unawaited(BookletLite.autoConvert(() => _items));
   }
 
   /// Restaura discos agregados a mano (copia de seguridad).

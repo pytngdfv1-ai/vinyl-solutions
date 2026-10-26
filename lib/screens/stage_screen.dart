@@ -9,11 +9,13 @@ import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../data/classifier.dart';
+import '../data/cover_color.dart';
 import '../data/cover_lookup.dart';
 import '../data/koofr_client.dart';
 import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
+import '../theme.dart';
 import 'booklet_screen.dart';
 import 'lyrics_sheet.dart';
 import 'move_dialog.dart';
@@ -35,6 +37,7 @@ class _StageScreenState extends State<StageScreen> {
   bool _flipped = false;
   bool _simPlaying = false; // discos sin audio: solo animación
   String? _error;
+  Color? _bg; // color de la portada (fondo del reproductor)
 
   Vinyl get v => widget.vinyl;
 
@@ -42,6 +45,13 @@ class _StageScreenState extends State<StageScreen> {
   void initState() {
     super.initState();
     _start();
+    _loadBg();
+  }
+
+  Future<void> _loadBg() async {
+    final c = await CoverColor.of(v.coverUrl);
+    final col = c ?? (v.coverUrl == null ? hueColor(v.hue, 0.5, 0.4) : null);
+    if (mounted && col != null) setState(() => _bg = CoverColor.background(col));
   }
 
   Future<void> _start() async {
@@ -183,9 +193,19 @@ class _StageScreenState extends State<StageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0F0E),
-      body: SafeArea(
-        child: Column(
+      backgroundColor: AppColors.ink,
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 700),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_bg ?? AppColors.ink, AppColors.ink],
+            stops: const [0.0, 0.85],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -288,6 +308,7 @@ class _StageScreenState extends State<StageScreen> {
               simPlaying: _simPlaying,
             ),
           ],
+        ),
         ),
       ),
     );
@@ -401,7 +422,7 @@ class _Info extends StatelessWidget {
           title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          style: const TextStyle(fontFamily: titleFont, fontSize: 19),
         ),
         Text(
           sub,
