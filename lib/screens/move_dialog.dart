@@ -85,7 +85,12 @@ class _MoveDialogState extends State<MoveDialog> {
             final nrel = [...plan.to, ...rel.sublist(plan.from.length)];
             final c = it.coverUrl;
             final keep = c != null && !c.contains('koofr.net');
-            carry[nrel.join('/')] = {'cover': keep ? c : null, 'owned': it.owned, 'cassette': it.cassette};
+            carry[nrel.join('/')] = {'cover': keep ? c : null, 'owned': it.owned,
+              'cassette': it.cassette,
+              'coverManual': it.coverManual,
+              'lang': it.lang,
+              'langManual': it.langManual,
+            };
           }
         }
       }

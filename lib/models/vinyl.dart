@@ -15,6 +15,9 @@ class Vinyl {
     this.source,
     this.single = false,
     this.cassette = false,
+    this.lang,
+    this.langManual = false,
+    this.coverManual = false,
   });
 
   final String id;
@@ -43,6 +46,13 @@ class Vinyl {
   /// Cover: se reproduce en el casetero y vive en el baúl "Covers".
   final bool cassette;
 
+  /// Idioma: 'en', 'es' o null (= "Sin clasificar").
+  final String? lang;
+
+  /// El usuario fijó el idioma / la marca de cover: la clasificación automática no lo toca.
+  final bool langManual;
+  final bool coverManual;
+
   /// Separador generado entre artistas (no es un disco real).
   bool get isDivider => id.startsWith('sep_');
 
@@ -60,6 +70,10 @@ class Vinyl {
     List<String>? booklet,
     List<String>? pdfs,
     bool? cassette,
+    String? lang,
+    bool clearLang = false,
+    bool? langManual,
+    bool? coverManual,
   }) =>
       Vinyl(
         id: id,
@@ -77,6 +91,9 @@ class Vinyl {
         source: source ?? this.source,
         single: single,
         cassette: cassette ?? this.cassette,
+        lang: clearLang ? null : (lang ?? this.lang),
+        langManual: langManual ?? this.langManual,
+        coverManual: coverManual ?? this.coverManual,
       );
 
   Map<String, dynamic> toJson() => {
@@ -95,6 +112,9 @@ class Vinyl {
         'source': source,
         'single': single,
         'cassette': cassette,
+        'lang': lang,
+        'langManual': langManual,
+        'coverManual': coverManual,
       };
 
   factory Vinyl.fromJson(Map<String, dynamic> j) => Vinyl(
@@ -113,5 +133,9 @@ class Vinyl {
         source: j['source'] as String?,
         single: j['single'] as bool? ?? false,
         cassette: j['cassette'] as bool? ?? false,
+        lang: j['lang'] as String?,
+        langManual: j['langManual'] as bool? ?? false,
+        // Biblioteca anterior: un cover marcado antes era siempre manual.
+        coverManual: j['coverManual'] as bool? ?? (j['cassette'] as bool? ?? false),
       );
 }
