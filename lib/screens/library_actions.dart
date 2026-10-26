@@ -31,6 +31,7 @@ Future<void> addDisc(BuildContext context, VinylStore store) async {
 Future<void> showLibrarySettings(BuildContext context) async {
   var value = LibrarySettings.minTracks.toDouble();
   var lite = BookletLite.auto;
+  var beside = BookletLite.beside;
   final token = TextEditingController(text: Discogs.token);
   final ok = await showDialog<bool>(
     context: context,
@@ -67,6 +68,17 @@ Future<void> showLibrarySettings(BuildContext context) async {
               value: lite,
               onChanged: (x) => setLocal(() => lite = x),
             ),
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Guardar la liviana junto al PDF'),
+              subtitle: const Text(
+                'Sube las páginas a una carpeta "Libreto liviano" al lado del PDF (nube o teléfono).',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: beside,
+              onChanged: (x) => setLocal(() => beside = x),
+            ),
             const SizedBox(height: 8),
             TextField(
               controller: token,
@@ -96,6 +108,7 @@ Future<void> showLibrarySettings(BuildContext context) async {
     await LibrarySettings.save(value.round());
     await Discogs.save(token.text);
     await BookletLite.setAuto(lite);
+    await BookletLite.setBeside(beside);
   }
   token.dispose();
 }

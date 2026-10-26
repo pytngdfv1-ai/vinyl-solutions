@@ -168,6 +168,33 @@ class KoofrClient {
     return MovePlan(dirs, [dest, d[d.length - 2], d.last], isDir: true);
   }
 
+  /// Crea (si faltan) las carpetas de [segs] relativas a la carpeta raíz.
+  Future<void> ensureDir(List<String> segs) async {
+    for (var i = 1; i <= segs.length; i++) {
+      await _mkcol(_under(segs.sublist(0, i), dir: true));
+    }
+  }
+
+  /// URL (con la etiqueta de cuenta) de una ruta relativa a la carpeta raíz.
+  String urlOf(List<String> segs) => _u(_under(segs));
+
+  /// Sube un archivo. Con [overwrite] false no pisa uno existente (devuelve false).
+  Future<bool> putBytes(List<String> dirSegs, String name, Uint8List bytes,
+      {bool overwrite = true, String type = 'application/octet-stream'}) async {
+    final req = http.Request('PUT', _under([...dirSegs, name]))
+      ..headers.addAll({
+        ...settings.headers,
+        'Content-Type': type,
+        if (!overwrite) 'If-None-Match': '*',
+      })
+      ..bodyBytes = bytes;
+    final res = await http.Response.fromStream(
+        await _http.send(req).timeout(const Duration(seconds: 90)));
+    if (res.statusCode == 200 || res.statusCode == 201 || res.statusCode == 204) return true;
+    if (res.statusCode == 412) return false;
+    _fail(res.statusCode);
+  }
+
   static bool _same(List<String> a, List<String> b) =>
       a.length == b.length && [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((x) => x);
 

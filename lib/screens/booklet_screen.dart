@@ -3,14 +3,17 @@ import 'package:pdfx/pdfx.dart';
 
 import '../data/booklet_lite.dart';
 import '../data/fetch_bytes.dart';
+import '../data/images_to_pdf.dart';
+import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/cover_art.dart';
 
 /// Libreto del álbum: páginas (imágenes) y PDFs, todo dentro de la app.
 class BookletScreen extends StatelessWidget {
-  const BookletScreen({super.key, required this.vinyl});
+  const BookletScreen({super.key, required this.vinyl, this.store});
 
   final Vinyl vinyl;
+  final VinylStore? store;
 
   static String _name(String url) {
     var n = Uri.parse(url).pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => 'PDF');
@@ -22,13 +25,15 @@ class BookletScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Las páginas livianas guardadas junto a un PDF se muestran en la pestaña de ese PDF.
+    final images = [for (final u in vinyl.booklet) if (!BookletLite.isLitePage(u)) u];
     final tabs = <String>[
-      if (vinyl.booklet.isNotEmpty) 'Imágenes (${vinyl.booklet.length})',
+      if (images.isNotEmpty) 'Imágenes (${images.length})',
       for (final p in vinyl.pdfs) _name(p),
     ];
     final views = <Widget>[
-      if (vinyl.booklet.isNotEmpty) _Pages(urls: vinyl.booklet),
-      for (final p in vinyl.pdfs) _PdfTab(url: p),
+      if (images.isNotEmpty) _ImagesTab(vinyl: vinyl, store: store, urls: images),
+      for (final p in vinyl.pdfs) _PdfTab(url: p, remote: BookletLite.remotePages(vinyl, p)),
     ];
     return DefaultTabController(
       length: tabs.length,
@@ -46,6 +51,82 @@ class BookletScreen extends StatelessWidget {
           children: views,
         ),
       ),
+    );
+  }
+}
+
+/// Pestaña de imágenes: visor y botón para crear un PDF con ellas.
+class _ImagesTab extends StatefulWidget {
+  const _ImagesTab({required this.vinyl, required this.store, required this.urls});
+
+  final Vinyl vinyl;
+  final VinylStore? store;
+  final List<String> urls;
+
+  @override
+  State<_ImagesTab> createState() => _ImagesTabState();
+}
+
+class _ImagesTabState extends State<_ImagesTab> with AutomaticKeepAliveClientMixin {
+  String? _progress;
+  String? _msg;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<void> _makePdf() async {
+    setState(() {
+      _msg = null;
+      _progress = 'Preparando…';
+    });
+    try {
+      final bytes = await ImagesToPdf.build(
+        widget.urls,
+        onProgress: (d, t) {
+          if (mounted) setState(() => _progress = '$d / $t');
+        },
+      );
+      final url = await ImagesToPdf.saveInAlbumFolder(widget.vinyl, bytes);
+      await widget.store?.addPdf(widget.vinyl.id, url);
+      final name = Uri.decodeFull(Uri.parse(url).pathSegments.last);
+      if (mounted) {
+        setState(() => _msg = 'PDF creado en la carpeta del disco: $name');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _msg = 'No se pudo crear el PDF: $e');
+    }
+    if (mounted) setState(() => _progress = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              if (_progress != null) ...[
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 10),
+                Text('Creando PDF… $_progress'),
+              ] else
+                TextButton.icon(
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  label: const Text('Crear PDF con estas imágenes'),
+                  onPressed: _makePdf,
+                ),
+            ],
+          ),
+        ),
+        if (_msg != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(_msg!, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          ),
+        Expanded(child: _Pages(urls: widget.urls)),
+      ],
     );
   }
 }
@@ -106,9 +187,12 @@ class _PagesState extends State<_Pages> {
 
 /// Un PDF del álbum: se puede ver el original o su versión liviana (imágenes WebP).
 class _PdfTab extends StatefulWidget {
-  const _PdfTab({required this.url});
+  const _PdfTab({required this.url, this.remote});
 
   final String url;
+
+  /// Páginas livianas ya guardadas junto al PDF (hechas en otro equipo).
+  final List<String>? remote;
 
   @override
   State<_PdfTab> createState() => _PdfTabState();
@@ -123,7 +207,8 @@ class _PdfTabState extends State<_PdfTab> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
-  bool get _lite => BookletLite.useLite(widget.url);
+  List<String>? get _pages => BookletLite.pagesOf(widget.url) ?? widget.remote;
+  bool get _lite => _pages != null && BookletLite.preferLite(widget.url);
 
   @override
   void initState() {
@@ -163,6 +248,7 @@ class _PdfTabState extends State<_PdfTab> with AutomaticKeepAliveClientMixin {
         },
       );
       _liteBytes = await BookletLite.sizeOf(widget.url);
+      _error = BookletLite.lastNote;
     } catch (e) {
       _error = 'No se pudo convertir: $e';
     }
@@ -192,13 +278,14 @@ class _PdfTabState extends State<_PdfTab> with AutomaticKeepAliveClientMixin {
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final hasLite = BookletLite.pagesOf(widget.url) != null;
+    final hasLite = _pages != null;
+    final hasLocal = BookletLite.pagesOf(widget.url) != null;
     final useLite = _lite;
     final c = _ctl;
 
     Widget body;
     if (useLite) {
-      body = _Pages(urls: BookletLite.pagesOf(widget.url)!);
+      body = _Pages(urls: _pages!);
     } else if (_error != null && c == null) {
       body = Center(
         child: Padding(
@@ -233,17 +320,18 @@ class _PdfTabState extends State<_PdfTab> with AutomaticKeepAliveClientMixin {
                     showSelectedIcon: false,
                     segments: [
                       const ButtonSegment(value: false, label: Text('PDF original')),
-                      ButtonSegment(value: true, label: Text('Liviana · ${_mb(_liteBytes)}')),
+                      ButtonSegment(value: true, label: Text(hasLocal ? 'Liviana · ${_mb(_liteBytes)}' : 'Liviana (nube)')),
                     ],
                     selected: {useLite},
                     onSelectionChanged: (s) => _setLite(s.first),
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Quitar versión liviana',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: _remove,
-                ),
+                if (hasLocal)
+                  IconButton(
+                    tooltip: 'Quitar versión liviana',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: _remove,
+                  ),
               ] else
                 TextButton.icon(
                   icon: const Icon(Icons.compress),
