@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/cajon.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/now_playing_chip.dart';
@@ -9,9 +10,10 @@ String _name(Vinyl v) => v.single && v.tracks.isNotEmpty ? v.tracks.first : v.ti
 
 /// Baúl "Covers": estantería con un cassette (de canto) por cada cover marcado.
 class CoversScreen extends StatelessWidget {
-  const CoversScreen({super.key, required this.store});
+  const CoversScreen({super.key, required this.store, required this.cajon});
 
   final VinylStore store;
+  final Cajon cajon;
 
   static const _perRow = 12;
 
@@ -20,7 +22,7 @@ class CoversScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: store,
       builder: (context, _) {
-        final list = store.items.where((v) => v.cassette && !v.isDivider).toList()
+        final list = store.items.where(cajon.matches).toList()
           ..sort((a, b) {
             String k(Vinyl v) {
               var s = v.artist.toLowerCase().trim();
@@ -39,7 +41,7 @@ class CoversScreen extends StatelessWidget {
           backgroundColor: const Color(0xFF0E0E0D),
           appBar: AppBar(
             backgroundColor: const Color(0xFF0E0E0D),
-            title: const Text('Covers', style: TextStyle(fontWeight: FontWeight.w900)),
+            title: Text(cajon.name, style: const TextStyle(fontWeight: FontWeight.w900)),
             actions: [
               IconButton(
                 tooltip: 'Menú principal',

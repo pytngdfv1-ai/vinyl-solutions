@@ -8,7 +8,9 @@ import '../data/library_order.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
+import '../data/classifier.dart';
 import '../data/cover_lookup.dart';
+import '../data/koofr_client.dart';
 import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
@@ -509,6 +511,46 @@ class DetailSheet extends StatelessWidget {
     return null;
   }
 
+  /// Tras cambiar el idioma: si la nube tiene una carpeta de ese idioma
+  /// (Inglés / Español), ofrece mover también la carpeta del disco. Solo si aceptas.
+  Future<void> _offerMove(BuildContext context, Vinyl v, String lang) async {
+    final acct = _cloudAccount(v);
+    if (acct == null || v.trackUrls.isEmpty) return;
+    try {
+      final client = KoofrClient(acct);
+      final tops = await client.topFolders();
+      final target = tops.where((f) => Classifier.langFromName(f) == lang).firstOrNull;
+      final rel = client.relSegments(v.trackUrls.first);
+      if (target == null || rel.isEmpty || rel.first == target) return;
+      if (!context.mounted) return;
+      final yes = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('¿Mover también en la nube?'),
+          content: Text('Hay una carpeta "$target". Puedo mover la carpeta del disco ahí; '
+              'si no, solo cambia la etiqueta en la app y tus archivos no se tocan.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Solo etiqueta')),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Mover')),
+          ],
+        ),
+      );
+      if (yes != true || !context.mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => MoveDialog(store: store, vinyl: v, account: acct, initial: target),
+      );
+      if (ok == true && context.mounted) {
+        LibrarySync.refresh(acct, store);
+        Navigator.of(context)
+          ..pop()
+          ..pop();
+      }
+    } catch (_) {
+      // Sin conexión: el idioma ya quedó guardado en la app.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -582,6 +624,34 @@ class DetailSheet extends StatelessWidget {
                     }
                     await store.setCassette(v.id, on, coverUrl: cover);
                   },
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Text('IDIOMA', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        children: [
+                          for (final o in const [('en', 'Inglés'), ('es', 'Español')])
+                            ChoiceChip(
+                              label: Text(o.$2),
+                              selected: v.lang == o.$1 && v.langManual,
+                              onSelected: (_) async {
+                                await store.setLang(v.id, o.$1);
+                                if (context.mounted) await _offerMove(context, v, o.$1);
+                              },
+                            ),
+                          ChoiceChip(
+                            label: Text(v.langManual ? 'Automático' : (v.lang == null ? 'Sin clasificar' : 'Automático')),
+                            selected: !v.langManual,
+                            onSelected: (_) => store.setLang(v.id, null),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 if (_cloudAccount(v) != null) ...[
                   const SizedBox(height: 8),

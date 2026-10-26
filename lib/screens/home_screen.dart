@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../audio/player_service.dart';
-import '../data/koofr_settings.dart';
-import '../data/library_order.dart';
+import '../data/cajon.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
@@ -14,27 +13,6 @@ import 'covers_screen.dart';
 import 'koofr_screen.dart';
 import 'library_actions.dart';
 import 'local_screen.dart';
-
-class _Lib {
-  const _Lib(this.id, this.name);
-  final String id;
-  final String name;
-}
-
-/// Nombre mostrado de una biblioteca: nunca dice "Koofr".
-String _libName(String n) {
-  final r = n.replaceAll(RegExp('koofr', caseSensitive: false), 'Nube').trim();
-  return r.isEmpty ? 'Nube' : r;
-}
-
-class _Chest {
-  const _Chest(this.lib, this.singles, this.items);
-  final _Lib lib;
-  final bool singles;
-  final List<Vinyl> items;
-
-  String get label => '${singles ? 'Sueltos' : 'Álbumes'} · ${lib.name}';
-}
 
 /// Pantalla principal: un cajón de madera por biblioteca
 /// (álbumes y, si hay, temas sueltos).
@@ -48,55 +26,52 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<_Chest> _chests(List<Vinyl> all) {
-    final libs = <_Lib>[];
-    List<String> groups(String prefix) => {
-          for (final v in all)
-            if (v.source != null && v.source!.startsWith(prefix)) v.source!,
-        }.toList()
-          ..sort();
-    for (final acc in KoofrAccounts.list) {
-      final gs = groups('${acc.id}:');
-      if (gs.isEmpty || all.any((v) => v.source == acc.id)) libs.add(_Lib(acc.id, _libName(acc.name)));
-      for (final g in gs) {
-        libs.add(_Lib(g, g.substring(acc.id.length + 1)));
-      }
-    }
-    if (all.any((v) => v.source == 'local')) libs.add(const _Lib('local', 'Teléfono'));
-    for (final g in groups('local:')) {
-      libs.add(_Lib(g, g.substring(6)));
-    }
-    if (all.any((v) => v.source == null)) libs.add(const _Lib('manual', 'Manuales'));
-    final out = <_Chest>[];
-    for (final lib in libs) {
-      final mine = all.where((v) => libraryOf(v) == lib.id).toList();
-      out.add(_Chest(lib, false, mine.where((v) => !v.single).toList()));
-      final singles = mine.where((v) => v.single).toList();
-      if (singles.isNotEmpty) out.add(_Chest(lib, true, singles));
-    }
-    return out;
-  }
-
   Future<void> _push(Widget page) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
     if (mounted) setState(() {});
   }
 
-  void _openChest(_Chest c) => _push(
-        CrateScreen(
-          store: widget.store,
-          source: c.lib.id,
-          singles: c.singles,
-          title: c.label,
+  void _openCajon(Cajon c) {
+    if (c.kind == CajonKind.covers) {
+      _push(CoversScreen(store: widget.store, cajon: c));
+    } else {
+      _push(CrateScreen(store: widget.store, cajon: c, title: c.name));
+    }
+  }
+
+  /// Mantén pulsado un cajón para cambiarle el nombre (vacío = nombre de fábrica).
+  Future<void> _rename(Cajon c) async {
+    final ctrl = TextEditingController(text: c.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nombre del cajón'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(hintText: c.defaultName),
         ),
-      );
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(ctrl.text), child: const Text('Guardar')),
+        ],
+      ),
+    );
+    if (name == null) return;
+    await ChestNames.set(c, name);
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.store,
       builder: (context, _) {
-        final chests = _chests(widget.store.items);
+        final all = widget.store.items;
+        final cajones = [
+          for (final c in Cajon.all)
+            if (all.any(c.matches)) c,
+        ];
         return Scaffold(
           backgroundColor: const Color(0xFF0E0E0D),
           appBar: AppBar(
@@ -142,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          body: chests.isEmpty
+          body: cajones.isEmpty
               ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
@@ -160,21 +135,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSpacing: 20,
                   childAspectRatio: 0.92,
                   children: [
-                    for (final c in chests)
-                      _CrateTile(
-                        label: c.label,
-                        count: c.items.length,
-                        singles: c.singles,
-                        covers: c.items,
-                        onTap: () => _openChest(c),
-                      ),
-                    // Baúl de covers: siempre al final del menú.
-                    if (widget.store.items.any((v) => v.cassette))
-                      _CabinetTile(
-                        covers: widget.store.items.where((v) => v.cassette).toList()
-                          ..sort((a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase())),
-                        onTap: () => _push(CoversScreen(store: widget.store)),
-                      ),
+                    for (final c in cajones)
+                      if (c.kind == CajonKind.covers)
+                        _CabinetTile(
+                          label: c.name,
+                          covers: all.where(c.matches).toList()
+                            ..sort((a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase())),
+                          onTap: () => _openCajon(c),
+                          onLongPress: () => _rename(c),
+                        )
+                      else
+                        _CrateTile(
+                          label: c.name,
+                          count: all.where(c.matches).length,
+                          singles: c.kind == CajonKind.singles,
+                          covers: all.where(c.matches).toList(),
+                          onTap: () => _openCajon(c),
+                          onLongPress: () => _rename(c),
+                        ),
                   ],
                 ),
           bottomNavigationBar: ValueListenableBuilder<Vinyl?>(
@@ -216,6 +194,7 @@ class _CrateTile extends StatelessWidget {
     required this.singles,
     required this.covers,
     required this.onTap,
+    this.onLongPress,
   });
 
   final String label;
@@ -223,6 +202,7 @@ class _CrateTile extends StatelessWidget {
   final bool singles;
   final List<Vinyl> covers;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -230,6 +210,7 @@ class _CrateTile extends StatelessWidget {
     final show = (withArt.isNotEmpty ? withArt : covers).take(4).toList();
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: LayoutBuilder(
         builder: (context, c) {
           final w = c.maxWidth;
@@ -364,10 +345,17 @@ class _CratePainter extends CustomPainter {
 /// Mueble de madera para cassettes (ranuras horizontales, 3 columnas):
 /// solo se ven los cassettes que hay; las demás ranuras quedan vacías.
 class _CabinetTile extends StatelessWidget {
-  const _CabinetTile({required this.covers, required this.onTap});
+  const _CabinetTile({
+    required this.label,
+    required this.covers,
+    required this.onTap,
+    this.onLongPress,
+  });
 
+  final String label;
   final List<Vinyl> covers;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   static const _cols = 3;
   static const _rows = 8;
@@ -431,6 +419,7 @@ class _CabinetTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Stack(
         children: [
           Positioned.fill(
@@ -479,8 +468,10 @@ class _CabinetTile extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Covers',
-                      style: TextStyle(
+                  Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                           color: Color(0xFF2B2118), fontWeight: FontWeight.w900, fontSize: 12)),
                   Text('${covers.length} cassettes',
                       style: const TextStyle(color: Color(0xFF6B5846), fontSize: 10)),
