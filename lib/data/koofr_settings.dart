@@ -88,6 +88,17 @@ class KoofrAccounts {
   static const _storage = FlutterSecureStorage();
   static const _key = 'koofr_accounts';
 
+  /// Cuenta a la que pertenece una URL (por el fragmento `#k=<id>`).
+  static KoofrSettings? byUrl(String url) {
+    final f = Uri.tryParse(url)?.fragment ?? '';
+    if (!f.startsWith('k=')) return null;
+    final id = f.substring(2);
+    for (final a in list) {
+      if (a.id == id) return a;
+    }
+    return null;
+  }
+
   static String newId() => 'k${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
 
   static Future<void> load() async {

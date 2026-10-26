@@ -226,7 +226,7 @@ class _StageScreenState extends State<StageScreen> {
                       tooltip: 'Libreto',
                       icon: const Icon(Icons.menu_book),
                       onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => BookletScreen(vinyl: v)),
+                        MaterialPageRoute<void>(builder: (_) => BookletScreen(vinyl: v, store: widget.store)),
                       ),
                     ),
                   IconButton(

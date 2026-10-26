@@ -235,6 +235,16 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Agrega un PDF al libreto del disco (por ejemplo, uno creado desde las imágenes).
+  Future<void> addPdf(String id, String url) async {
+    _items = [
+      for (final v in _items)
+        if (v.id == id && !v.pdfs.contains(url)) v.copyWith(pdfs: [...v.pdfs, url]) else v,
+    ];
+    notifyListeners();
+    await _save();
+  }
+
   /// El usuario fija el idioma de un disco (null = volver a automático).
   /// Se recuerda por artista y se aplica a sus demás discos no corregidos a mano.
   Future<void> setLang(String id, String? lang) async {
