@@ -5,6 +5,7 @@ import '../data/cajon.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
+import '../theme.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/now_playing_chip.dart';
 import 'backup_screen.dart';
@@ -73,10 +74,10 @@ class _HomeScreenState extends State<HomeScreen> {
             if (all.any(c.matches)) c,
         ];
         return Scaffold(
-          backgroundColor: const Color(0xFF0E0E0D),
+          backgroundColor: AppColors.ink,
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0E0E0D),
-            title: const Text('VinylSolutions', style: TextStyle(fontWeight: FontWeight.w900)),
+            backgroundColor: AppColors.ink,
+            title: const Text('VinylSolutions'),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(2),
               child: ValueListenableBuilder<String?>(
@@ -271,9 +272,9 @@ class _CrateTile extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
+                              fontFamily: titleFont,
                               color: Color(0xFF2B2118),
-                              fontWeight: FontWeight.w900,
-                              fontSize: 12,
+                              fontSize: 13,
                               height: 1.1,
                             ),
                           ),
@@ -472,7 +473,7 @@ class _CabinetTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          color: Color(0xFF2B2118), fontWeight: FontWeight.w900, fontSize: 12)),
+                          fontFamily: titleFont, color: Color(0xFF2B2118), fontSize: 13)),
                   Text('${covers.length} cassettes',
                       style: const TextStyle(color: Color(0xFF6B5846), fontSize: 10)),
                 ],

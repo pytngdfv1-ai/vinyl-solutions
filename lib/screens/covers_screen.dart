@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/cajon.dart';
+import '../theme.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/now_playing_chip.dart';
@@ -38,10 +39,10 @@ class CoversScreen extends StatelessWidget {
             list.sublist(i, i + _perRow > list.length ? list.length : i + _perRow),
         ];
         return Scaffold(
-          backgroundColor: const Color(0xFF0E0E0D),
+          backgroundColor: AppColors.ink,
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0E0E0D),
-            title: Text(cajon.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+            backgroundColor: AppColors.ink,
+            title: Text(cajon.name),
             actions: [
               IconButton(
                 tooltip: 'Menú principal',

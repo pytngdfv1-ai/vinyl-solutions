@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../audio/player_service.dart';
 import '../data/cajon.dart';
+import '../theme.dart';
 import '../data/library_names.dart';
 import '../data/library_order.dart';
 import '../data/library_sync.dart';
@@ -150,7 +151,7 @@ class _CrateScreenState extends State<CrateScreen> {
         return Scaffold(
           backgroundColor: Colors.black,
           drawer: Drawer(
-            backgroundColor: const Color(0xFF161816),
+            backgroundColor: AppColors.panel,
             child: SafeArea(
               child: ListView(
                 children: [
@@ -158,7 +159,7 @@ class _CrateScreenState extends State<CrateScreen> {
                     padding: EdgeInsets.all(20),
                     child: Text(
                       'VinylSolutions',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                      style: TextStyle(fontFamily: titleFont, fontSize: 22),
                     ),
                   ),
                   ListTile(
@@ -287,7 +288,7 @@ class _CrateScreenState extends State<CrateScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Color(0xFF5CFF7A),
+                              color: AppColors.gold,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
