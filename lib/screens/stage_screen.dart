@@ -8,6 +8,7 @@ import '../data/library_order.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
+import '../data/booklet_lite.dart';
 import '../data/classifier.dart';
 import '../data/cover_color.dart';
 import '../data/cover_lookup.dart';
@@ -38,6 +39,7 @@ class _StageScreenState extends State<StageScreen> {
   bool _simPlaying = false; // discos sin audio: solo animación
   String? _error;
   Color? _bg; // color de la portada (fondo del reproductor)
+  int _page = 0; // página del carrusel (0 = carátula)
 
   Vinyl get v => widget.vinyl;
 
@@ -46,6 +48,19 @@ class _StageScreenState extends State<StageScreen> {
     super.initState();
     _start();
     _loadBg();
+  }
+
+  /// Páginas del libreto para el carrusel: imágenes y versiones livianas de los PDF.
+  List<String> _bookletPages() {
+    final out = <String>[
+      for (final u in v.booklet)
+        if (!BookletLite.isLitePage(u)) u,
+    ];
+    for (final pdf in v.pdfs) {
+      final lite = BookletLite.pagesOf(pdf) ?? BookletLite.remotePages(v, pdf);
+      if (lite != null) out.addAll(lite);
+    }
+    return out;
   }
 
   Future<void> _loadBg() async {
@@ -274,6 +289,12 @@ class _StageScreenState extends State<StageScreen> {
                             vinyl: v,
                             flipped: _flipped,
                             onTrack: _playTrack,
+                            front: _Carousel(
+                              vinyl: v,
+                              pages: _bookletPages(),
+                              initial: _page,
+                              onPage: (i) => _page = i,
+                            ),
                           ),
                         ),
                       ),
@@ -435,16 +456,118 @@ class _Info extends StatelessWidget {
   }
 }
 
+/// Carátula + páginas del libreto: desliza hacia el costado para pasar de página,
+/// pellizca para ampliar. Al tocar, se da vuelta la tapa (lista de temas).
+class _Carousel extends StatefulWidget {
+  const _Carousel({
+    required this.vinyl,
+    required this.pages,
+    required this.initial,
+    required this.onPage,
+  });
+
+  final Vinyl vinyl;
+  final List<String> pages;
+  final int initial;
+  final ValueChanged<int> onPage;
+
+  @override
+  State<_Carousel> createState() => _CarouselState();
+}
+
+class _CarouselState extends State<_Carousel> {
+  late final PageController _ctl;
+  late int _i;
+
+  int get _count => 1 + widget.pages.length;
+
+  @override
+  void initState() {
+    super.initState();
+    _i = widget.initial.clamp(0, _count - 1);
+    _ctl = PageController(initialPage: _i);
+  }
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.pages.isEmpty) return CoverArt(vinyl: widget.vinyl);
+    const broken = Center(child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 48));
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _ctl,
+          itemCount: _count,
+          onPageChanged: (i) {
+            widget.onPage(i);
+            setState(() => _i = i);
+          },
+          itemBuilder: (_, i) {
+            if (i == 0) return CoverArt(vinyl: widget.vinyl);
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: ColoredBox(
+                color: Colors.black,
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Center(
+                    child: buildCoverImage(
+                      widget.pages[i - 1],
+                      cacheWidth: 1400,
+                      fit: BoxFit.contain,
+                      fallback: broken,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 8,
+          child: IgnorePointer(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  _i == 0 ? 'Carátula · desliza ▸' : '${_i + 1} / $_count',
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _FlipCover extends StatelessWidget {
   const _FlipCover({
     required this.vinyl,
     required this.flipped,
     required this.onTrack,
+    required this.front,
   });
 
   final Vinyl vinyl;
   final bool flipped;
   final ValueChanged<int> onTrack;
+
+  /// Cara de adelante: la carátula y, deslizando, las páginas del libreto.
+  final Widget front;
 
   @override
   Widget build(BuildContext context) {
@@ -465,7 +588,7 @@ class _FlipCover extends StatelessWidget {
                   transform: Matrix4.rotationY(math.pi),
                   child: _Back(vinyl: vinyl, onTrack: onTrack),
                 )
-              : CoverArt(vinyl: vinyl),
+              : front,
         );
       },
     );
