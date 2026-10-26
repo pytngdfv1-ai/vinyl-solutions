@@ -9,6 +9,7 @@ class FlacMeta {
   String? albumArtist;
   String? album;
   String? date;
+  String? language;
   Uint8List? picture;
   String? pictureMime;
 }
@@ -88,6 +89,9 @@ void _comments(Uint8List d, FlacMeta m) {
         m.albumArtist ??= v;
       case 'ALBUM':
         m.album ??= v;
+      case 'LANGUAGE':
+      case 'LANG':
+        m.language ??= v;
       case 'DATE':
       case 'YEAR':
         m.date ??= v;

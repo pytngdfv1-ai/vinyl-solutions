@@ -39,6 +39,7 @@ class BackupService {
         for (final v in store.items)
           if (!v.owned) v.id,
       ],
+      'classes': store.classExport(),
       'cassettes': [
         for (final v in store.items)
           if (v.cassette) v.id,
@@ -109,11 +110,14 @@ class BackupService {
 
     final cassettes = (d['cassettes'] as List? ?? const []).cast<String>();
     if (cassettes.isNotEmpty) await store.markCassette(cassettes);
+    final classes = d['classes'] as Map<String, dynamic>?;
+    if (classes != null) await store.classImport(classes);
 
     // Sincroniza las nubes en segundo plano y reaplica las marcas.
     LibrarySync.syncAll(store).then((_) {
       store.markNotOwned(notOwned);
       store.markCassette(cassettes);
+      if (classes != null) store.classImport(classes);
     });
     return '${accounts.length} cuentas restauradas. Sincronizando en segundo plano…';
   }

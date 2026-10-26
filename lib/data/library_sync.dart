@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'koofr_client.dart';
@@ -33,6 +35,7 @@ class LibrarySync {
       result.albums,
       genre: a.genre.trim().isEmpty ? null : a.genre.trim(),
     );
+    unawaited(store.reclassify());
     final min = LibrarySettings.minTracks;
     return result.albums.isEmpty
         ? 'Conectado, pero no encontré álbumes completos. ${client.diagnostic}\n${result.summary(min)}'

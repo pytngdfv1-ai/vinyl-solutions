@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/vinyl.dart';
+import 'classifier.dart';
 import 'library_order.dart';
 
 /// Biblioteca local-first: todo vive en el dispositivo (SharedPreferences).
@@ -26,6 +28,10 @@ class VinylStore extends ChangeNotifier {
         };
       }
     } catch (_) {}
+    try {
+      final a = _prefs!.getString('artist_lang_v1');
+      if (a != null) _artistLang = Map<String, String>.from(jsonDecode(a) as Map);
+    } catch (_) {}
     final raw = _prefs!.getString(_key);
     if (raw != null) {
       try {
@@ -39,6 +45,8 @@ class VinylStore extends ChangeNotifier {
       }
     }
     notifyListeners();
+    // Biblioteca guardada antes de la clasificación: se clasifica en segundo plano.
+    unawaited(reclassify());
   }
 
   Future<void> add({
@@ -67,7 +75,9 @@ class VinylStore extends ChangeNotifier {
   Future<void> setCassette(String id, bool on, {String? coverUrl}) async {
     _items = [
       for (final v in _items)
-        v.id == id ? v.copyWith(cassette: on, coverUrl: v.coverUrl ?? coverUrl) : v,
+        v.id == id
+            ? v.copyWith(cassette: on, coverManual: true, coverUrl: v.coverUrl ?? coverUrl)
+            : v,
     ];
     notifyListeners();
     await _save();
@@ -75,7 +85,10 @@ class VinylStore extends ChangeNotifier {
 
   Future<void> markCassette(List<String> ids) async {
     final s = ids.toSet();
-    _items = [for (final v in _items) s.contains(v.id) ? v.copyWith(cassette: true) : v];
+    _items = [
+      for (final v in _items)
+        s.contains(v.id) ? v.copyWith(cassette: true, coverManual: true) : v,
+    ];
     notifyListeners();
     await _save();
   }
@@ -96,7 +109,8 @@ class VinylStore extends ChangeNotifier {
 
   /// Datos que se conservan al mover: ruta nueva (relativa) -> {cover, owned, genre}.
   Map<String, Map<String, dynamic>> _carry = {};
-  Set<String> _cassettes = {};
+  /// Recuerda por artista el idioma que el usuario eligió: artista -> 'en' | 'es'.
+  Map<String, String> _artistLang = {};
 
   Future<void> addCarry(Map<String, Map<String, dynamic>> m) async {
     _carry = {..._carry, ...m};
@@ -120,13 +134,25 @@ class VinylStore extends ChangeNotifier {
   bool _fromAccount(Vinyl v, String accountId) =>
       sourceInAccount(v.source, accountId) || (v.source == null && v.id.startsWith('dav_'));
 
-  Vinyl _applyCarry(Vinyl v, Map<String, bool> owned, String? genre, String accountId,
-      List<String> used) {
-    var r = v.copyWith(
-        owned: owned[v.id] ?? true,
-        genre: genre,
-        source: v.source ?? accountId,
-        cassette: _cassettes.contains(v.id) ? true : null);
+  /// Aplica lo que el usuario fijó a mano (idioma, cover) y el idioma recordado por artista.
+  Vinyl _keepManual(Vinyl v, Vinyl? old) {
+    var r = v;
+    if (old != null && old.langManual) {
+      r = r.copyWith(lang: old.lang, langManual: true);
+    } else {
+      final a = _artistLang[Classifier.artistKey(v.artist)];
+      if (a != null) r = r.copyWith(lang: a);
+    }
+    if (old != null && old.coverManual) {
+      r = r.copyWith(cassette: old.cassette, coverManual: true);
+    }
+    return r;
+  }
+
+  Vinyl _applyCarry(Vinyl v, Vinyl? old, Map<String, bool> owned, String? genre,
+      String accountId, List<String> used) {
+    var r = _keepManual(
+        v.copyWith(owned: owned[v.id] ?? true, genre: genre, source: v.source ?? accountId), old);
     if (v.trackUrls.isEmpty || _carry.isEmpty) return r;
     final path = Uri.decodeFull(Uri.parse(v.trackUrls.first).removeFragment().path);
     for (final e in _carry.entries) {
@@ -136,8 +162,13 @@ class VinylStore extends ChangeNotifier {
         r = r.copyWith(
           owned: owned.containsKey(v.id) ? r.owned : (e.value['owned'] as bool? ?? true),
           coverUrl: v.coverUrl ?? c,
-          cassette: (e.value['cassette'] as bool? ?? false) ? true : null,
         );
+        if (e.value['coverManual'] == true) {
+          r = r.copyWith(cassette: e.value['cassette'] == true, coverManual: true);
+        }
+        if (e.value['langManual'] == true && e.value['lang'] is String) {
+          r = r.copyWith(lang: e.value['lang'] as String, langManual: true);
+        }
         break;
       }
     }
@@ -147,11 +178,11 @@ class VinylStore extends ChangeNotifier {
   /// Reemplaza los discos de una cuenta de Koofr por el último escaneo.
   Future<void> replaceAccount(String accountId, List<Vinyl> scanned, {String? genre}) async {
     final owned = {for (final v in _items) v.id: v.owned};
-    _cassettes = {for (final v in _items) if (v.cassette) v.id};
+    final oldById = {for (final v in _items) v.id: v};
     final others = _items.where((v) => !_fromAccount(v, accountId)).toList();
     final used = <String>[];
     final fresh = [
-      for (final v in scanned) _applyCarry(v, owned, genre, accountId, used),
+      for (final v in scanned) _applyCarry(v, oldById[v.id], owned, genre, accountId, used),
     ];
     if (used.isNotEmpty) {
       for (final k in used) {
@@ -174,13 +205,11 @@ class VinylStore extends ChangeNotifier {
   Future<void> addAlbums(List<Vinyl> albums) async {
     final ids = {for (final a in albums) a.id};
     final owned = {for (final v in _items) v.id: v.owned};
-    final cas = {for (final v in _items) if (v.cassette) v.id};
+    final oldById = {for (final v in _items) v.id: v};
     _items = [
       for (final a in albums)
-        a.copyWith(
-            owned: owned[a.id] ?? true,
-            source: a.source ?? 'local',
-            cassette: cas.contains(a.id) ? true : null),
+        _keepManual(
+            a.copyWith(owned: owned[a.id] ?? true, source: a.source ?? 'local'), oldById[a.id]),
       ..._items.where((v) => !ids.contains(v.id)),
     ];
     notifyListeners();
@@ -200,6 +229,96 @@ class VinylStore extends ChangeNotifier {
     final s = ids.toSet();
     _items = [for (final v in _items) s.contains(v.id) ? v.copyWith(owned: false) : v];
     notifyListeners();
+    await _save();
+  }
+
+  /// El usuario fija el idioma de un disco (null = volver a automático).
+  /// Se recuerda por artista y se aplica a sus demás discos no corregidos a mano.
+  Future<void> setLang(String id, String? lang) async {
+    final cur = _items.where((v) => v.id == id).firstOrNull;
+    if (cur == null) return;
+    final key = Classifier.artistKey(cur.artist);
+    if (lang == null) {
+      _artistLang.remove(key);
+      _items = [
+        for (final v in _items)
+          if (v.id == id)
+            v.copyWith(langManual: false, lang: Classifier.detectLang(v), clearLang: Classifier.detectLang(v) == null)
+          else
+            v,
+      ];
+    } else {
+      _artistLang[key] = lang;
+      _items = [
+        for (final v in _items)
+          if (v.id == id)
+            v.copyWith(lang: lang, langManual: true)
+          else if (!v.langManual && Classifier.artistKey(v.artist) == key)
+            v.copyWith(lang: lang)
+          else
+            v,
+      ];
+    }
+    notifyListeners();
+    await _prefs?.setString('artist_lang_v1', jsonEncode(_artistLang));
+    await _save();
+  }
+
+  /// Clasifica en segundo plano lo que aún no tiene idioma (sin bloquear la interfaz)
+  /// y detecta covers por el nombre. Nunca toca lo corregido a mano.
+  Future<void> reclassify() async {
+    final changes = <String, ({String? lang, bool? cover})>{};
+    var n = 0;
+    for (final v in List.of(_items)) {
+      if (v.isDivider) continue;
+      String? lang;
+      if (!v.langManual && v.lang == null) {
+        lang = _artistLang[Classifier.artistKey(v.artist)] ?? Classifier.detectLang(v);
+      }
+      final cover = !v.coverManual && !v.cassette && Classifier.detectCover(v) ? true : null;
+      if (lang != null || cover != null) changes[v.id] = (lang: lang, cover: cover);
+      if (++n % 60 == 0) await Future<void>.delayed(Duration.zero);
+    }
+    if (changes.isEmpty) return;
+    _items = [
+      for (final v in _items)
+        if (changes[v.id] != null)
+          v.copyWith(lang: changes[v.id]!.lang, cassette: changes[v.id]!.cover)
+        else
+          v,
+    ];
+    notifyListeners();
+    await _save();
+  }
+
+  /// Copia de seguridad: idiomas fijados a mano, idioma por artista y covers manuales.
+  Map<String, dynamic> classExport() => {
+        'langs': {
+          for (final v in _items)
+            if (v.langManual && v.lang != null) v.id: v.lang,
+        },
+        'artistLang': _artistLang,
+        'coverManual': {
+          for (final v in _items)
+            if (v.coverManual) v.id: v.cassette,
+        },
+      };
+
+  Future<void> classImport(Map<String, dynamic> d) async {
+    final langs = Map<String, String>.from((d['langs'] as Map?) ?? const {});
+    final cm = Map<String, bool>.from((d['coverManual'] as Map?) ?? const {});
+    _artistLang = {..._artistLang, ...Map<String, String>.from((d['artistLang'] as Map?) ?? const {})};
+    _items = [
+      for (final v in _items)
+        v.copyWith(
+          lang: langs[v.id],
+          langManual: langs.containsKey(v.id) ? true : null,
+          cassette: cm[v.id],
+          coverManual: cm.containsKey(v.id) ? true : null,
+        ),
+    ];
+    notifyListeners();
+    await _prefs?.setString('artist_lang_v1', jsonEncode(_artistLang));
     await _save();
   }
 

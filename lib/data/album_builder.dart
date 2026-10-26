@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../models/vinyl.dart';
+import 'classifier.dart';
 import 'cover_cache.dart';
 import 'cover_lookup.dart';
 import 'flac_meta.dart';
@@ -170,6 +171,12 @@ Future<Vinyl?> _build(AlbumDraft d) async {
     if (year == 0) year = hit?.year ?? 0;
   }
 
+  // Clasificación automática: etiqueta del archivo > carpeta de categoría > texto.
+  final lang = Classifier.langFromTag(m?.language) ??
+      Classifier.langFromSource(d.source) ??
+      Classifier.langFromText('$title ${tracks.join(' ')} $artist');
+  final isCover = Classifier.isCover('${d.key} $title ${tracks.join(' ')}');
+
   return Vinyl(
     id: d.id,
     title: title,
@@ -184,5 +191,7 @@ Future<Vinyl?> _build(AlbumDraft d) async {
     single: d.single,
     source: d.source,
     owned: true,
+    lang: lang,
+    cassette: isCover,
   );
 }
