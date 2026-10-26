@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openCajon(Cajon c) {
-    if (c.kind == CajonKind.covers) {
+    if (c.kind == CajonKind.covers || c.kind == CajonKind.singles) {
       _push(CoversScreen(store: widget.store, cajon: c));
     } else {
       _push(CrateScreen(store: widget.store, cajon: c, title: c.name));
@@ -137,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   childAspectRatio: 0.92,
                   children: [
                     for (final c in cajones)
-                      if (c.kind == CajonKind.covers)
+                      if (c.kind == CajonKind.covers || c.kind == CajonKind.singles)
                         _CabinetTile(
                           label: c.name,
                           covers: all.where(c.matches).toList()
