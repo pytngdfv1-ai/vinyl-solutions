@@ -152,6 +152,7 @@ Future<Vinyl?> _build(AlbumDraft d) async {
       cover = await CoverCache.save(d.key, pic, m?.pictureMime);
     } catch (_) {}
   }
+  String? mbLang;
   var year = yearOf(m?.date);
   if (year == 0 && !d.single) year = yearOf(d.folderAlbum);
 
@@ -167,13 +168,15 @@ Future<Vinyl?> _build(AlbumDraft d) async {
       tracks: tracks,
       trackFirst: d.single,
     );
-    cover ??= hit?.url;
+    if (cover == null && hit != null) cover = await CoverCache.remember(d.key, hit.url);
+    mbLang = hit?.lang;
     if (year == 0) year = hit?.year ?? 0;
   }
 
   // Clasificación automática: etiqueta del archivo > carpeta de categoría > texto.
   final lang = Classifier.langFromTag(m?.language) ??
       Classifier.langFromSource(d.source) ??
+      mbLang ??
       Classifier.langFromText('$title ${tracks.join(' ')} $artist');
   final isCover = Classifier.isCover('${d.key} $title ${tracks.join(' ')}');
 
