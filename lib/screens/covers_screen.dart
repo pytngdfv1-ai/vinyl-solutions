@@ -56,7 +56,7 @@ class CoversScreen extends StatelessWidget {
                   child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
-                      'Aún no hay covers\nAbre un tema, toca ⓘ y activa "Es un cover"',
+                      'No hay nada aquí todavía',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white54),
                     ),
