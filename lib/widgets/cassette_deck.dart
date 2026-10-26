@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../models/vinyl.dart';
 
@@ -36,26 +37,61 @@ class CassetteDeck extends StatefulWidget {
   State<CassetteDeck> createState() => _CassetteDeckState();
 }
 
+/// Estado de los carretes: ángulos (giro antihorario) y avance de la cinta.
+class _ReelState extends ChangeNotifier {
+  double aL = 0, aR = 0, overall = 0;
+  Color tint = const Color(0xFFE8C14A);
+  void tick() => notifyListeners();
+}
+
 class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  final _st = _ReelState();
+  late final Ticker _ticker = createTicker(_tick);
+  Duration _last = Duration.zero;
+
+  // Radios (en alturas del cassette): la cinta avanza a velocidad constante,
+  // así que el carrete con menos cinta gira más rápido.
+  static const _rMax = 0.205, _rMin = 0.115, _rMid = 0.16;
+
+  void _tick(Duration e) {
+    final dt = (e - _last).inMicroseconds / 1e6;
+    _last = e;
+    if (dt <= 0 || dt > 0.5) return;
+    final o = _st.overall;
+    final rl = _rMax - (_rMax - _rMin) * o;
+    final rr = _rMin + (_rMax - _rMin) * o;
+    const w0 = 2.6; // rad/s con el rollo a medio radio
+    // Antihorario (negativo en pantalla), los dos igual, como al reproducir.
+    _st.aL -= w0 * _rMid / rl * dt;
+    _st.aR -= w0 * _rMid / rr * dt;
+    _st.tick();
+  }
+
+  void _sync() {
+    if (widget.playing && !_ticker.isActive) {
+      _last = Duration.zero;
+      _ticker.start();
+    } else if (!widget.playing && _ticker.isActive) {
+      _ticker.stop();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.playing) _c.repeat();
+    _sync();
   }
 
   @override
   void didUpdateWidget(covariant CassetteDeck old) {
     super.didUpdateWidget(old);
-    if (widget.playing && !_c.isAnimating) _c.repeat();
-    if (!widget.playing && _c.isAnimating) _c.stop();
+    _sync();
   }
 
   @override
   void dispose() {
-    _c.dispose();
+    _ticker.dispose();
+    _st.dispose();
     super.dispose();
   }
 
@@ -66,6 +102,8 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
     final overall = ((widget.trackIndex + widget.progress) / n).clamp(0.0, 1.0).toDouble();
     final sideB = n > 1 && widget.trackIndex >= (n / 2).ceil();
     final tint = HSLColor.fromAHSL(1, v.hue % 360, 0.62, 0.5).toColor();
+    _st.overall = overall;
+    _st.tint = tint;
     return LayoutBuilder(builder: (context, c) {
       final w = c.maxWidth;
       final cw = w * 0.84;
@@ -134,17 +172,7 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
                 height: ch,
                 child: Stack(
                   children: [
-                    AnimatedBuilder(
-                      animation: _c,
-                      builder: (_, __) => CustomPaint(
-                        size: Size(cw, ch),
-                        painter: _CassettePainter(
-                          spin: _c.value * 2 * math.pi,
-                          overall: overall,
-                          tint: tint,
-                        ),
-                      ),
-                    ),
+                    CustomPaint(size: Size(cw, ch), painter: _CassettePainter(_st)),
                     // Etiqueta escrita a mano.
                     Positioned(
                       left: cw * 0.11,
@@ -369,11 +397,11 @@ class _GlassPainter extends CustomPainter {
 }
 
 class _CassettePainter extends CustomPainter {
-  _CassettePainter({required this.spin, required this.overall, required this.tint});
+  _CassettePainter(this.st) : super(repaint: st);
 
-  final double spin;
-  final double overall;
-  final Color tint;
+  final _ReelState st;
+  double get overall => st.overall;
+  Color get tint => st.tint;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -477,26 +505,30 @@ class _CassettePainter extends CustomPainter {
             stops: const [0.5, 0.9, 1.0],
           ).createShader(Rect.fromCircle(center: c, radius: r)),
       );
+      // Anillos concéntricos de la cinta enrollada.
+      final ring = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.6
+        ..color = const Color(0x2A000000);
+      for (var q = rHub * 1.12; q < r; q += h * 0.011) {
+        canvas.drawCircle(c, q, ring);
+      }
       canvas.drawCircle(
         c,
         r,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1
-          ..color = const Color(0x33FFFFFF),
+          ..color = const Color(0x44FFFFFF),
       );
     }
-    // Cinta entre los carretes y hacia los rodillos de abajo.
-    final tapePaint = Paint()
-      ..color = const Color(0xFF5A3F2D)
-      ..strokeWidth = h * 0.012;
-    canvas.drawLine(Offset(lx - leftTape * 0.2, cy + leftTape), Offset(w * 0.17, h * 0.92), tapePaint);
-    canvas.drawLine(Offset(rx + rightTape * 0.2, cy + rightTape), Offset(w * 0.83, h * 0.92), tapePaint);
     canvas.restore();
 
     // Carretes (aro blanco con 6 dientes hacia adentro).
-    _hub(canvas, Offset(lx, cy), rHub, spin);
-    _hub(canvas, Offset(rx, cy), rHub, spin * 1.0);
+    final nearEmptyL = leftTape < rMin + (rMax - rMin) * 0.25;
+    final nearEmptyR = rightTape < rMin + (rMax - rMin) * 0.25;
+    _hub(canvas, Offset(lx, cy), rHub, st.aL, nearEmptyL);
+    _hub(canvas, Offset(rx, cy), rHub, st.aR, nearEmptyR);
 
     // Ventanilla central con marcas del contador.
     final mid = RRect.fromRectAndRadius(
@@ -559,6 +591,7 @@ class _CassettePainter extends CustomPainter {
       canvas.drawCircle(Offset(x, h * 0.92), h * 0.04, metal);
       canvas.drawCircle(Offset(x, h * 0.92), h * 0.018, hole);
     }
+    _tape(canvas, w, h, Offset(lx, cy), leftTape, Offset(rx, cy), rightTape);
     // Orificios del cabezal y cabrestante.
     canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036, hole);
     canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036,
@@ -586,18 +619,92 @@ class _CassettePainter extends CustomPainter {
     }
   }
 
-  void _hub(Canvas canvas, Offset c, double r, double a) {
-    canvas.drawCircle(c, r, Paint()..color = const Color(0xFFF1F1EE));
-    canvas.drawCircle(c, r * 0.72, Paint()..color = const Color(0xFF111112));
+  /// Punto de tangencia desde [p] al rollo (centro [c], radio [r]); del lado exterior.
+  Offset _tangent(Offset c, double r, Offset p, bool left) {
+    final d = (p - c).distance;
+    if (d <= r + 0.5) return c + Offset(left ? -r : r, 0);
+    final th = math.atan2(p.dy - c.dy, p.dx - c.dx);
+    final al = math.acos(r / d);
+    final a = c + Offset(math.cos(th + al), math.sin(th + al)) * r;
+    final b = c + Offset(math.cos(th - al), math.sin(th - al)) * r;
+    return left ? (a.dx < b.dx ? a : b) : (a.dx > b.dx ? a : b);
+  }
+
+  /// La cinta sale tangente al borde del rollo izquierdo (origen), da la vuelta a los
+  /// rodillos de abajo, cruza el frente y entra tangente al borde del rollo derecho (destino).
+  void _tape(Canvas canvas, double w, double h, Offset cl, double rl, Offset cr, double rr) {
+    final g1 = Offset(w * 0.17, h * 0.92);
+    final g2 = Offset(w * 0.83, h * 0.92);
+    final k = h * 0.04;
+    final p1 = g1 + Offset(-k, 0);
+    final p2 = g2 + Offset(k, 0);
+    final t1 = _tangent(cl, rl, p1, true);
+    final t2 = _tangent(cr, rr, p2, false);
+    final path = Path()
+      ..moveTo(t1.dx, t1.dy)
+      ..lineTo(p1.dx, p1.dy)
+      ..arcTo(Rect.fromCircle(center: g1, radius: k), math.pi, -math.pi / 2, false)
+      ..lineTo(g2.dx, g2.dy + k)
+      ..arcTo(Rect.fromCircle(center: g2, radius: k), math.pi / 2, -math.pi / 2, false)
+      ..lineTo(t2.dx, t2.dy);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = h * 0.014
+        ..strokeJoin = StrokeJoin.round
+        ..color = const Color(0xFF5A3F2D),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = h * 0.004
+        ..color = const Color(0x55FFFFFF),
+    );
+  }
+
+  /// Carrete: aro blanco translúcido con aletas, centro oscuro con 6 dientes y ranura
+  /// en cruz. La pestaña roja (punta de la cinta) se ve cuando el rollo casi se acabó.
+  void _hub(Canvas canvas, Offset c, double r, double a, bool showClip) {
+    canvas.drawCircle(c, r, Paint()..color = const Color(0xFFEDEDEA));
+    final fin = Paint()
+      ..color = const Color(0x33000000)
+      ..strokeWidth = 0.8;
+    for (var i = 0; i < 12; i++) {
+      final ang = a + i * math.pi / 6;
+      canvas.drawLine(c + Offset(math.cos(ang), math.sin(ang)) * r * 0.72,
+          c + Offset(math.cos(ang), math.sin(ang)) * r * 0.97, fin);
+    }
+    canvas.drawCircle(c, r * 0.62, Paint()..color = const Color(0xFF111112));
     final tooth = Paint()
-      ..color = const Color(0xFFF1F1EE)
-      ..strokeWidth = r * 0.2
+      ..color = const Color(0xFFEDEDEA)
+      ..strokeWidth = r * 0.18
       ..strokeCap = StrokeCap.butt;
     for (var i = 0; i < 6; i++) {
       final ang = a + i * math.pi / 3;
-      final p1 = c + Offset(math.cos(ang), math.sin(ang)) * r * 0.42;
-      final p2 = c + Offset(math.cos(ang), math.sin(ang)) * r * 0.76;
-      canvas.drawLine(p1, p2, tooth);
+      canvas.drawLine(c + Offset(math.cos(ang), math.sin(ang)) * r * 0.40,
+          c + Offset(math.cos(ang), math.sin(ang)) * r * 0.64, tooth);
+    }
+    canvas.drawCircle(c, r * 0.22, Paint()..color = const Color(0xFF2A2A2C));
+    final cross = Paint()
+      ..color = const Color(0xFF777777)
+      ..strokeWidth = 0.8;
+    canvas.drawLine(c + Offset(math.cos(a), math.sin(a)) * r * 0.16,
+        c - Offset(math.cos(a), math.sin(a)) * r * 0.16, cross);
+    canvas.drawLine(c + Offset(-math.sin(a), math.cos(a)) * r * 0.16,
+        c - Offset(-math.sin(a), math.cos(a)) * r * 0.16, cross);
+    if (showClip) {
+      canvas.save();
+      canvas.translate(c.dx, c.dy);
+      canvas.rotate(a + math.pi * 0.62);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(0, -r * 0.84), width: r * 0.55, height: r * 0.2),
+            Radius.circular(r * 0.08)),
+        Paint()..color = const Color(0xFFC0394B),
+      );
+      canvas.restore();
     }
     canvas.drawCircle(
       c,
@@ -610,6 +717,5 @@ class _CassettePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CassettePainter o) =>
-      o.spin != spin || o.overall != overall || o.tint != tint;
+  bool shouldRepaint(covariant _CassettePainter o) => true;
 }
