@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
 
+import '../data/booklet_lite.dart';
 import '../data/fetch_bytes.dart';
 import '../models/vinyl.dart';
 import '../widgets/cover_art.dart';
@@ -103,7 +104,7 @@ class _PagesState extends State<_Pages> {
   }
 }
 
-/// Un PDF del álbum, mostrado dentro de la app.
+/// Un PDF del álbum: se puede ver el original o su versión liviana (imágenes WebP).
 class _PdfTab extends StatefulWidget {
   const _PdfTab({required this.url});
 
@@ -116,17 +117,30 @@ class _PdfTab extends StatefulWidget {
 class _PdfTabState extends State<_PdfTab> with AutomaticKeepAliveClientMixin {
   PdfControllerPinch? _ctl;
   String? _error;
+  String? _progress; // "3 / 12" mientras convierte
+  int _liteBytes = 0;
 
   @override
   bool get wantKeepAlive => true;
 
+  bool get _lite => BookletLite.useLite(widget.url);
+
   @override
   void initState() {
     super.initState();
-    _load();
+    _afterChange();
   }
 
-  Future<void> _load() async {
+  Future<void> _afterChange() async {
+    if (BookletLite.pagesOf(widget.url) != null) {
+      final n = await BookletLite.sizeOf(widget.url);
+      if (mounted) setState(() => _liteBytes = n);
+    }
+    if (!_lite) await _loadPdf();
+  }
+
+  Future<void> _loadPdf() async {
+    if (_ctl != null) return;
     try {
       final bytes = await fetchBytes(widget.url);
       if (!mounted) return;
@@ -136,30 +150,117 @@ class _PdfTabState extends State<_PdfTab> with AutomaticKeepAliveClientMixin {
     }
   }
 
+  Future<void> _convert() async {
+    setState(() {
+      _error = null;
+      _progress = 'Preparando…';
+    });
+    try {
+      await BookletLite.convert(
+        widget.url,
+        onProgress: (d, t) {
+          if (mounted) setState(() => _progress = '$d / $t');
+        },
+      );
+      _liteBytes = await BookletLite.sizeOf(widget.url);
+    } catch (e) {
+      _error = 'No se pudo convertir: $e';
+    }
+    if (mounted) setState(() => _progress = null);
+  }
+
+  Future<void> _setLite(bool v) async {
+    await BookletLite.setUseLite(widget.url, v);
+    if (mounted) setState(() {});
+    if (!v) await _loadPdf();
+  }
+
+  Future<void> _remove() async {
+    await BookletLite.remove(widget.url);
+    if (mounted) setState(() => _liteBytes = 0);
+    await _loadPdf();
+  }
+
   @override
   void dispose() {
     _ctl?.dispose();
     super.dispose();
   }
 
+  String _mb(int b) => '${(b / 1048576).toStringAsFixed(1)} MB';
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (_error != null) {
-      return Center(
+    final hasLite = BookletLite.pagesOf(widget.url) != null;
+    final useLite = _lite;
+    final c = _ctl;
+
+    Widget body;
+    if (useLite) {
+      body = _Pages(urls: BookletLite.pagesOf(widget.url)!);
+    } else if (_error != null && c == null) {
+      body = Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(_error!, textAlign: TextAlign.center),
         ),
       );
+    } else if (c == null) {
+      body = const Center(child: CircularProgressIndicator());
+    } else {
+      body = PdfViewPinch(
+        controller: c,
+        onDocumentError: (e) {
+          if (mounted) setState(() => _error = 'No se pudo abrir el PDF: $e');
+        },
+      );
     }
-    final c = _ctl;
-    if (c == null) return const Center(child: CircularProgressIndicator());
-    return PdfViewPinch(
-      controller: c,
-      onDocumentError: (e) {
-        if (mounted) setState(() => _error = 'No se pudo abrir el PDF: $e');
-      },
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              if (_progress != null) ...[
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 10),
+                Text('Convirtiendo… $_progress'),
+              ] else if (hasLite) ...[
+                Expanded(
+                  child: SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    segments: [
+                      const ButtonSegment(value: false, label: Text('PDF original')),
+                      ButtonSegment(value: true, label: Text('Liviana · ${_mb(_liteBytes)}')),
+                    ],
+                    selected: {useLite},
+                    onSelectionChanged: (s) => _setLite(s.first),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Quitar versión liviana',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: _remove,
+                ),
+              ] else
+                TextButton.icon(
+                  icon: const Icon(Icons.compress),
+                  label: const Text('Convertir a versión liviana'),
+                  onPressed: _convert,
+                ),
+              if (_error != null && c != null) const Icon(Icons.error_outline, color: Colors.redAccent),
+            ],
+          ),
+        ),
+        if (_error != null && (c != null || useLite))
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+          ),
+        Expanded(child: body),
+      ],
     );
   }
 }

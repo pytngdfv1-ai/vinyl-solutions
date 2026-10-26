@@ -27,3 +27,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Abril
+      fonts:
+        - asset: assets/fonts/AbrilFatface-Regular.ttf

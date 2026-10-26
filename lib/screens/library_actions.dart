@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../audio/player_service.dart';
+import '../data/booklet_lite.dart';
 import '../data/discogs.dart';
 import '../data/library_settings.dart';
 import '../data/vinyl_store.dart';
@@ -29,6 +30,7 @@ Future<void> addDisc(BuildContext context, VinylStore store) async {
 
 Future<void> showLibrarySettings(BuildContext context) async {
   var value = LibrarySettings.minTracks.toDouble();
+  var lite = BookletLite.auto;
   final token = TextEditingController(text: Discogs.token);
   final ok = await showDialog<bool>(
     context: context,
@@ -53,6 +55,17 @@ Future<void> showLibrarySettings(BuildContext context) async {
               divisions: 14,
               label: '${value.round()}',
               onChanged: (v) => setLocal(() => value = v),
+            ),
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Folletos PDF como imágenes livianas'),
+              subtitle: const Text(
+                'Al importar, convierte cada PDF a WebP (~1600 px). El PDF original no se borra.',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: lite,
+              onChanged: (x) => setLocal(() => lite = x),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -82,6 +95,7 @@ Future<void> showLibrarySettings(BuildContext context) async {
   if (ok == true) {
     await LibrarySettings.save(value.round());
     await Discogs.save(token.text);
+    await BookletLite.setAuto(lite);
   }
   token.dispose();
 }
