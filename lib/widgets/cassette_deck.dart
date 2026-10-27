@@ -51,7 +51,7 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
 
   // Radios (en alturas del cassette): la cinta avanza a velocidad constante,
   // así que el carrete con menos cinta gira más rápido.
-  static const _rMax = 0.205, _rMin = 0.115, _rMid = 0.16;
+  static const _rMax = 0.205, _rMin = 0.13, _rMid = 0.1675;
 
   void _tick(Duration e) {
     final dt = (e - _last).inMicroseconds / 1e6;
@@ -483,8 +483,8 @@ class _CassettePainter extends CustomPainter {
     canvas.save();
     canvas.clipRRect(win);
 
-    final rHub = h * 0.092;
-    final rMin = h * 0.115;
+    final rHub = h * 0.11;
+    final rMin = h * 0.13;
     final rMax = h * 0.205;
     final cy = h * 0.615;
     final lx = w * 0.30;
@@ -591,7 +591,11 @@ class _CassettePainter extends CustomPainter {
       canvas.drawCircle(Offset(x, h * 0.92), h * 0.04, metal);
       canvas.drawCircle(Offset(x, h * 0.92), h * 0.018, hole);
     }
+    // La cinta solo se ve dentro de la ventana; abajo queda tapada por la carcasa.
+    canvas.save();
+    canvas.clipRRect(win);
     _tape(canvas, w, h, Offset(lx, cy), leftTape, Offset(rx, cy), rightTape);
+    canvas.restore();
     // Orificios del cabezal y cabrestante.
     canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036, hole);
     canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036,
