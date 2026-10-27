@@ -51,7 +51,7 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
 
   // Radios (en alturas del cassette): la cinta avanza a velocidad constante,
   // así que el carrete con menos cinta gira más rápido.
-  static const _rMax = 0.205, _rMin = 0.13, _rMid = 0.1675;
+  static const _rMax = 0.1245, _rMin = 0.101, _rMid = 0.1128;
 
   void _tick(Duration e) {
     final dt = (e - _last).inMicroseconds / 1e6;
@@ -175,10 +175,10 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
                     CustomPaint(size: Size(cw, ch), painter: _CassettePainter(_st)),
                     // Etiqueta escrita a mano.
                     Positioned(
-                      left: cw * 0.11,
-                      top: ch * 0.075,
-                      width: cw * 0.78,
-                      height: ch * 0.25,
+                      left: cw * 0.09,
+                      top: ch * 0.09,
+                      width: cw * 0.84,
+                      height: ch * 0.22,
                       child: Center(
                         child: Text(
                           widget.label,
@@ -194,8 +194,8 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
                       ),
                     ),
                     Positioned(
-                      left: cw * 0.115,
-                      top: ch * 0.345,
+                      left: cw * 0.085,
+                      top: ch * 0.6,
                       child: Container(
                         padding: EdgeInsets.symmetric(horizontal: cw * 0.014),
                         decoration: BoxDecoration(
@@ -213,7 +213,7 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
                     ),
                     Positioned(
                       right: cw * 0.12,
-                      top: ch * 0.355,
+                      top: ch * 0.6,
                       child: Text(
                         'NORMAL · ${v.tracks.length} T',
                         style: TextStyle(
@@ -396,6 +396,9 @@ class _GlassPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
+/// Cassette dibujado con las proporciones de un cassette real (medidas tomadas de la
+/// imagen de referencia): etiqueta, franja de color, ventana tipo píldora con los dos
+/// carretes en sus extremos, ventanilla del contador y parte baja con rodillos.
 class _CassettePainter extends CustomPainter {
   _CassettePainter(this.st) : super(repaint: st);
 
@@ -409,7 +412,7 @@ class _CassettePainter extends CustomPainter {
     final h = size.height;
     final shell = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.03));
 
-    // --- Carcasa: plástico transparente ahumado ---
+    // --- Carcasa: plástico ahumado transparente ---
     canvas.drawRRect(
       shell,
       Paint()
@@ -434,16 +437,19 @@ class _CassettePainter extends CustomPainter {
         ..color = const Color(0x99B8BCC2),
     );
 
-    // --- Etiqueta de papel con renglones y borde superior recortado ---
-    final lab = Rect.fromLTWH(w * 0.075, h * 0.05, w * 0.85, h * 0.29);
+    // --- Etiqueta blanca (esquinas superiores cortadas) ---
+    final l = w * 0.07, r = w * 0.943;
+    final lt = h * 0.09, lb = h * 0.31;
+    final cx = w * 0.03, cyc = h * 0.045;
     final labPath = Path()
-      ..addRRect(RRect.fromRectAndCorners(
-        lab,
-        topLeft: Radius.circular(w * 0.03),
-        topRight: Radius.circular(w * 0.03),
-        bottomLeft: const Radius.circular(1),
-        bottomRight: const Radius.circular(1),
-      ));
+      ..moveTo(l + cx, lt)
+      ..lineTo(r - cx, lt)
+      ..lineTo(r, lt + cyc)
+      ..lineTo(r, lb)
+      ..lineTo(l, lb)
+      ..lineTo(l, lt + cyc)
+      ..close();
+    final labRect = Rect.fromLTRB(l, lt, r, lb);
     canvas.drawPath(
       labPath,
       Paint()
@@ -451,122 +457,141 @@ class _CassettePainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [Color(0xFFFCFAF4), Color(0xFFE9E4D6)],
-        ).createShader(lab),
+        ).createShader(labRect),
     );
     final rule = Paint()
       ..color = const Color(0x553B63C4)
       ..strokeWidth = 0.7;
     for (var i = 1; i <= 3; i++) {
-      final y = lab.top + lab.height * (0.28 + i * 0.2);
-      canvas.drawLine(Offset(lab.left + 6, y), Offset(lab.right - 6, y), rule);
+      final y = lt + (lb - lt) * (0.28 + i * 0.2);
+      canvas.drawLine(Offset(l + 6, y), Offset(r - 6, y), rule);
     }
     canvas.drawLine(
-      Offset(lab.left + w * 0.08, lab.top),
-      Offset(lab.left + w * 0.08, lab.bottom),
+      Offset(l + w * 0.07, lt),
+      Offset(l + w * 0.07, lb),
       Paint()
         ..color = const Color(0x55D8453C)
         ..strokeWidth = 0.8,
     );
-    // Franja de color bajo la etiqueta.
-    final band = Rect.fromLTWH(lab.left, lab.bottom, lab.width, h * 0.055);
-    canvas.drawRect(band, Paint()..color = tint);
+
+    // --- Franja de color (naranja en la referencia; aquí, el tono del disco) ---
+    final strip = Rect.fromLTRB(l, lb, r, h * 0.74);
+    canvas.drawRect(strip, Paint()..color = tint);
+    canvas.drawRect(Rect.fromLTRB(l, lb, r, lb + h * 0.012), Paint()..color = const Color(0x55000000));
     canvas.drawRect(
-        Rect.fromLTWH(band.left, band.top, band.width, band.height * 0.35),
-        Paint()..color = const Color(0x33FFFFFF));
-
-    // --- Ventana del carrete y cinta ---
-    final win = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.11, h * 0.43, w * 0.78, h * 0.37),
-      Radius.circular(h * 0.185),
+      Rect.fromLTRB(l, lb + h * 0.012, r, lb + h * 0.07),
+      Paint()..color = const Color(0x22FFFFFF),
     );
-    canvas.drawRRect(win, Paint()..color = const Color(0xFF050506));
-    canvas.save();
-    canvas.clipRRect(win);
 
-    final rHub = h * 0.11;
-    final rMin = h * 0.13;
-    final rMax = h * 0.205;
-    final cy = h * 0.615;
-    final lx = w * 0.30;
-    final rx = w * 0.70;
-    final leftTape = rMax - (rMax - rMin) * overall; // se vacía
-    final rightTape = rMin + (rMax - rMin) * overall; // se llena
-
-    for (final e in [(Offset(lx, cy), leftTape), (Offset(rx, cy), rightTape)]) {
-      final c = e.$1;
-      final r = e.$2;
-      // Cinta enrollada marrón con brillo.
-      canvas.drawCircle(
-        c,
-        r,
-        Paint()
-          ..shader = RadialGradient(
-            colors: const [Color(0xFF6B4A33), Color(0xFF3A2619), Color(0xFF52382A)],
-            stops: const [0.5, 0.9, 1.0],
-          ).createShader(Rect.fromCircle(center: c, radius: r)),
-      );
-      // Anillos concéntricos de la cinta enrollada.
-      final ring = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.6
-        ..color = const Color(0x2A000000);
-      for (var q = rHub * 1.12; q < r; q += h * 0.011) {
-        canvas.drawCircle(c, q, ring);
-      }
-      canvas.drawCircle(
-        c,
-        r,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = const Color(0x44FFFFFF),
-      );
-    }
-    canvas.restore();
-
-    // Carretes (aro blanco con 6 dientes hacia adentro).
-    final nearEmptyL = leftTape < rMin + (rMax - rMin) * 0.25;
-    final nearEmptyR = rightTape < rMin + (rMax - rMin) * 0.25;
-    _hub(canvas, Offset(lx, cy), rHub, st.aL, nearEmptyL);
-    _hub(canvas, Offset(rx, cy), rHub, st.aR, nearEmptyR);
-
-    // Ventanilla central con marcas del contador.
-    final mid = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(w * 0.5, cy), width: w * 0.17, height: h * 0.15),
-      const Radius.circular(2),
+    // --- Ventana en forma de píldora con los dos carretes en los extremos ---
+    final pill = RRect.fromRectAndRadius(
+      Rect.fromLTRB(w * 0.21, h * 0.337, w * 0.805, h * 0.585),
+      Radius.circular(h * 0.124),
     );
-    canvas.drawRRect(mid, Paint()..color = const Color(0xFF0C0C0D));
+    canvas.drawRRect(pill, Paint()..color = const Color(0xFF2A2A2C));
     canvas.drawRRect(
-      mid,
+      pill,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1
-        ..color = const Color(0x66FFFFFF),
+        ..color = const Color(0x55000000),
     );
-    // Cinta visible: franja clara cuyo ancho sigue el avance.
+
+    final hubR = h * 0.0945; // diámetro del carrete = 0,19 de la altura (como la referencia)
+    final fullR = h * 0.1245; // el rollo lleno llega al borde de la píldora
+    final emptyR = hubR * 1.07;
+    final cy = h * 0.459;
+    final lx = w * 0.288;
+    final rx = w * 0.727;
+    final rl = emptyR + (fullR - emptyR) * (1 - overall); // se vacía
+    final rr = emptyR + (fullR - emptyR) * overall; // se llena
+
+    canvas.save();
+    canvas.clipRRect(pill);
+    for (final e in [(Offset(lx, cy), rl), (Offset(rx, cy), rr)]) {
+      final c = e.$1;
+      final rad = e.$2;
+      canvas.drawCircle(
+        c,
+        rad,
+        Paint()
+          ..shader = RadialGradient(
+            colors: const [Color(0xFF6B4A33), Color(0xFF3A2619), Color(0xFF52382A)],
+            stops: const [0.6, 0.92, 1.0],
+          ).createShader(Rect.fromCircle(center: c, radius: rad)),
+      );
+      final ring = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.5
+        ..color = const Color(0x2A000000);
+      for (var q = hubR * 1.1; q < rad; q += h * 0.008) {
+        canvas.drawCircle(c, q, ring);
+      }
+    }
+    // La cinta pasa por abajo de un rollo al otro (origen: izquierdo, destino: derecho).
+    final tape = Path()
+      ..moveTo(lx, cy + rl)
+      ..lineTo(rx, cy + rr);
+    canvas.drawPath(
+      tape,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = h * 0.012
+        ..color = const Color(0xFF5A3F2D),
+    );
+    canvas.restore();
+
+    _hub(canvas, Offset(lx, cy), hubR, st.aL, rl < hubR * 1.12);
+    _hub(canvas, Offset(rx, cy), hubR, st.aR, rr < hubR * 1.12);
+
+    // --- Ventanilla del contador entre los carretes ---
+    final cw = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(w * 0.508, h * 0.42), width: w * 0.224, height: h * 0.117),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(cw, Paint()..color = const Color(0xFF8A6A4A));
+    canvas.save();
+    canvas.clipRRect(cw);
+    final brownW = cw.width * (0.1 + 0.8 * (1 - overall)); // cinta que queda a la izquierda
     canvas.drawRect(
-      Rect.fromCenter(center: Offset(w * 0.5, cy), width: w * 0.15, height: h * 0.05),
-      Paint()..color = const Color(0xFF6D4C37),
+      Rect.fromLTWH(cw.left, cw.top, brownW, cw.height),
+      Paint()..color = const Color(0xFF5B4030),
     );
+    canvas.drawRect(
+      Rect.fromLTRB(cw.left + brownW, cw.top, cw.right, cw.bottom),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFF4F4F2), Color(0xFFBDBDBA)],
+        ).createShader(cw.outerRect),
+    );
+    canvas.restore();
+    canvas.drawRRect(
+      cw,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0x66000000),
+    );
+    // Marcas y números del contador.
     final tick = Paint()
       ..color = const Color(0x88FFFFFF)
       ..strokeWidth = 0.7;
-    for (var i = 0; i <= 8; i++) {
-      final x = w * 0.5 - w * 0.075 + i * (w * 0.15 / 8);
-      canvas.drawLine(Offset(x, cy + h * 0.055), Offset(x, cy + h * (i.isEven ? 0.072 : 0.065)), tick);
+    for (var i = 0; i <= 10; i++) {
+      final x = cw.left + i * cw.width / 10;
+      canvas.drawLine(Offset(x, h * 0.488), Offset(x, h * (i.isEven ? 0.512 : 0.502)), tick);
     }
-    canvas.drawCircle(
-      Offset(w * 0.5 - w * 0.075 + overall * w * 0.15, cy + h * 0.015),
-      h * 0.012,
-      Paint()..color = const Color(0xFFFFE08A),
-    );
+    _text(canvas, '100', Offset(cw.left + cw.width * 0.05, h * 0.545), h * 0.032);
+    _text(canvas, '50', Offset(cw.left + cw.width * 0.5, h * 0.545), h * 0.032);
+    _text(canvas, '0', Offset(cw.right - cw.width * 0.02, h * 0.545), h * 0.032);
 
-    // --- Parte baja: trapecio con rodillos y cabezal ---
+    // --- Parte baja: trapecio con rodillos blancos y cuadraditos ---
     final low = Path()
-      ..moveTo(w * 0.17, h * 0.80)
-      ..lineTo(w * 0.83, h * 0.80)
-      ..lineTo(w * 0.90, h * 0.985)
-      ..lineTo(w * 0.10, h * 0.985)
+      ..moveTo(w * 0.204, h * 0.745)
+      ..lineTo(w * 0.829, h * 0.745)
+      ..lineTo(w * 0.865, h * 0.99)
+      ..lineTo(w * 0.165, h * 0.99)
       ..close();
     canvas.drawPath(
       low,
@@ -574,8 +599,8 @@ class _CassettePainter extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF17181A), Color(0xFF0C0C0D)],
-        ).createShader(Rect.fromLTWH(0, h * 0.8, w, h * 0.2)),
+          colors: [Color(0xFF1B1C1E), Color(0xFF0C0C0D)],
+        ).createShader(Rect.fromLTWH(0, h * 0.74, w, h * 0.26)),
     );
     canvas.drawPath(
       low,
@@ -584,140 +609,88 @@ class _CassettePainter extends CustomPainter {
         ..strokeWidth = 1
         ..color = const Color(0x55FFFFFF),
     );
-    final metal = Paint()..color = const Color(0xFFC5C8CC);
-    final hole = Paint()..color = const Color(0xFF000000);
-    // Rodillos guía (con cinta pasando).
-    for (final x in [w * 0.17, w * 0.83]) {
-      canvas.drawCircle(Offset(x, h * 0.92), h * 0.04, metal);
-      canvas.drawCircle(Offset(x, h * 0.92), h * 0.018, hole);
+    final white = Paint()..color = const Color(0xFFEFEFEF);
+    canvas.drawCircle(Offset(w * 0.27, h * 0.938), w * 0.025, white);
+    canvas.drawCircle(Offset(w * 0.751, h * 0.938), w * 0.025, white);
+    for (final x in [w * 0.37, w * 0.655]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(x, h * 0.914), width: w * 0.033, height: w * 0.033),
+            const Radius.circular(2)),
+        white,
+      );
     }
-    // La cinta solo se ve dentro de la ventana; abajo queda tapada por la carcasa.
-    canvas.save();
-    canvas.clipRRect(win);
-    _tape(canvas, w, h, Offset(lx, cy), leftTape, Offset(rx, cy), rightTape);
-    canvas.restore();
-    // Orificios del cabezal y cabrestante.
-    canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036, hole);
-    canvas.drawCircle(Offset(w * 0.5, h * 0.9), h * 0.036,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = const Color(0x66FFFFFF));
-    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.34, h * 0.885), width: w * 0.032, height: h * 0.05), hole);
-    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.66, h * 0.885), width: w * 0.032, height: h * 0.05), hole);
-    canvas.drawRect(Rect.fromCenter(center: Offset(w * 0.5, h * 0.82), width: w * 0.06, height: h * 0.03),
-        Paint()..color = const Color(0xFF8A6A3C)); // almohadilla de presión
 
-    // --- Tornillos (5, como el cassette real) ---
+    // --- Tornillos: 4 esquinas + 1 en el centro de la parte baja ---
+    final sr = w * 0.018;
     for (final p in [
-      Offset(w * 0.035, h * 0.055),
-      Offset(w * 0.965, h * 0.055),
-      Offset(w * 0.035, h * 0.945),
-      Offset(w * 0.965, h * 0.945),
-      Offset(w * 0.5, h * 0.36),
+      Offset(w * 0.034, h * 0.05),
+      Offset(w * 0.976, h * 0.05),
+      Offset(w * 0.034, h * 0.96),
+      Offset(w * 0.976, h * 0.96),
+      Offset(w * 0.51, h * 0.837),
     ]) {
       canvas.save();
-      canvas.translate(p.dx - w * 0.011, p.dy - w * 0.011);
-      _ScrewPainter().paint(canvas, Size(w * 0.022, w * 0.022));
+      canvas.translate(p.dx - sr, p.dy - sr);
+      _ScrewPainter().paint(canvas, Size(sr * 2, sr * 2));
       canvas.restore();
     }
   }
 
-  /// Punto de tangencia desde [p] al rollo (centro [c], radio [r]); del lado exterior.
-  Offset _tangent(Offset c, double r, Offset p, bool left) {
-    final d = (p - c).distance;
-    if (d <= r + 0.5) return c + Offset(left ? -r : r, 0);
-    final th = math.atan2(p.dy - c.dy, p.dx - c.dx);
-    final al = math.acos(r / d);
-    final a = c + Offset(math.cos(th + al), math.sin(th + al)) * r;
-    final b = c + Offset(math.cos(th - al), math.sin(th - al)) * r;
-    return left ? (a.dx < b.dx ? a : b) : (a.dx > b.dx ? a : b);
+  void _text(Canvas canvas, String t, Offset center, double size) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: t,
+        style: TextStyle(color: const Color(0x66FFFFFF), fontSize: size, fontWeight: FontWeight.w600),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 
-  /// La cinta sale tangente al borde del rollo izquierdo (origen), da la vuelta a los
-  /// rodillos de abajo, cruza el frente y entra tangente al borde del rollo derecho (destino).
-  void _tape(Canvas canvas, double w, double h, Offset cl, double rl, Offset cr, double rr) {
-    final g1 = Offset(w * 0.17, h * 0.92);
-    final g2 = Offset(w * 0.83, h * 0.92);
-    final k = h * 0.04;
-    final p1 = g1 + Offset(-k, 0);
-    final p2 = g2 + Offset(k, 0);
-    final t1 = _tangent(cl, rl, p1, true);
-    final t2 = _tangent(cr, rr, p2, false);
-    final path = Path()
-      ..moveTo(t1.dx, t1.dy)
-      ..lineTo(p1.dx, p1.dy)
-      ..arcTo(Rect.fromCircle(center: g1, radius: k), math.pi, -math.pi / 2, false)
-      ..lineTo(g2.dx, g2.dy + k)
-      ..arcTo(Rect.fromCircle(center: g2, radius: k), math.pi / 2, -math.pi / 2, false)
-      ..lineTo(t2.dx, t2.dy);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = h * 0.014
-        ..strokeJoin = StrokeJoin.round
-        ..color = const Color(0xFF5A3F2D),
-    );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = h * 0.004
-        ..color = const Color(0x55FFFFFF),
-    );
-  }
-
-  /// Carrete: aro blanco translúcido con aletas, centro oscuro con 6 dientes y ranura
-  /// en cruz. La pestaña roja (punta de la cinta) se ve cuando el rollo casi se acabó.
+  /// Carrete como en la referencia: aro blanco, centro negro y 6 dientes blancos
+  /// que giran. La pestaña roja (punta de la cinta) aparece cuando el rollo casi se acabó.
   void _hub(Canvas canvas, Offset c, double r, double a, bool showClip) {
-    canvas.drawCircle(c, r, Paint()..color = const Color(0xFFEDEDEA));
-    final fin = Paint()
-      ..color = const Color(0x33000000)
-      ..strokeWidth = 0.8;
-    for (var i = 0; i < 12; i++) {
-      final ang = a + i * math.pi / 6;
-      canvas.drawLine(c + Offset(math.cos(ang), math.sin(ang)) * r * 0.72,
-          c + Offset(math.cos(ang), math.sin(ang)) * r * 0.97, fin);
-    }
-    canvas.drawCircle(c, r * 0.62, Paint()..color = const Color(0xFF111112));
+    canvas.drawCircle(c, r, Paint()..color = const Color(0xFFF1F1EE));
+    canvas.drawCircle(c, r * 0.9, Paint()..color = const Color(0xFF121214));
     final tooth = Paint()
-      ..color = const Color(0xFFEDEDEA)
-      ..strokeWidth = r * 0.18
+      ..color = const Color(0xFFF1F1EE)
+      ..strokeWidth = r * 0.2
       ..strokeCap = StrokeCap.butt;
     for (var i = 0; i < 6; i++) {
       final ang = a + i * math.pi / 3;
-      canvas.drawLine(c + Offset(math.cos(ang), math.sin(ang)) * r * 0.40,
-          c + Offset(math.cos(ang), math.sin(ang)) * r * 0.64, tooth);
+      canvas.drawLine(c + Offset(math.cos(ang), math.sin(ang)) * r * 0.66,
+          c + Offset(math.cos(ang), math.sin(ang)) * r * 0.9, tooth);
     }
-    canvas.drawCircle(c, r * 0.22, Paint()..color = const Color(0xFF2A2A2C));
+    // Centro: cilindro oscuro con brillo y ranura en cruz.
+    canvas.drawCircle(
+      c,
+      r * 0.5,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.3, -0.35),
+          colors: [Color(0xFF55565A), Color(0xFF0E0E10)],
+        ).createShader(Rect.fromCircle(center: c, radius: r * 0.5)),
+    );
     final cross = Paint()
-      ..color = const Color(0xFF777777)
-      ..strokeWidth = 0.8;
-    canvas.drawLine(c + Offset(math.cos(a), math.sin(a)) * r * 0.16,
-        c - Offset(math.cos(a), math.sin(a)) * r * 0.16, cross);
-    canvas.drawLine(c + Offset(-math.sin(a), math.cos(a)) * r * 0.16,
-        c - Offset(-math.sin(a), math.cos(a)) * r * 0.16, cross);
+      ..color = const Color(0xFF8A8A8E)
+      ..strokeWidth = 0.7;
+    canvas.drawLine(c + Offset(math.cos(a), math.sin(a)) * r * 0.2,
+        c - Offset(math.cos(a), math.sin(a)) * r * 0.2, cross);
+    canvas.drawLine(c + Offset(-math.sin(a), math.cos(a)) * r * 0.2,
+        c - Offset(-math.sin(a), math.cos(a)) * r * 0.2, cross);
     if (showClip) {
       canvas.save();
       canvas.translate(c.dx, c.dy);
       canvas.rotate(a + math.pi * 0.62);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(0, -r * 0.84), width: r * 0.55, height: r * 0.2),
-            Radius.circular(r * 0.08)),
+            Rect.fromCenter(center: Offset(0, -r * 0.8), width: r * 0.5, height: r * 0.18),
+            Radius.circular(r * 0.07)),
         Paint()..color = const Color(0xFFC0394B),
       );
       canvas.restore();
     }
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8
-        ..color = const Color(0x66000000),
-    );
   }
 
   @override
