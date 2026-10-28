@@ -87,7 +87,7 @@ class _DjTableState extends State<DjTable> with SingleTickerProviderStateMixin {
       builder: (_, session, __) => StreamBuilder<int?>(
         stream: _audio.player.currentIndexStream,
         initialData: _audio.player.currentIndex,
-        builder: (_, ix, __) {
+        builder: (_, ix) {
           final ci = ix.data ?? 0;
           final list = session?.entries ?? const <PlEntry>[];
           PlEntry? at(int i) => i >= 0 && i < list.length ? list[i] : null;
