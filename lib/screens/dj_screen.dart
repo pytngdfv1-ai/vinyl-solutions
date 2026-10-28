@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../audio/dj_feed.dart';
 import '../audio/player_service.dart';
 import '../audio/playlist_player.dart';
 import '../data/playlists.dart';
@@ -18,6 +19,7 @@ class DjScreen extends StatefulWidget {
 
 class _DjScreenState extends State<DjScreen> {
   final _audio = PlayerService.instance;
+  final _feed = PlaylistFeed();
 
   @override
   void initState() {
@@ -29,6 +31,7 @@ class _DjScreenState extends State<DjScreen> {
 
   @override
   void dispose() {
+    _feed.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -56,7 +59,7 @@ class _DjScreenState extends State<DjScreen> {
             return Column(
               children: [
                 _TopBar(session: s, audio: _audio),
-                const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: DjTable())),
+                Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: DjTable(feed: _feed))),
                 _Strip(session: s, audio: _audio),
               ],
             );
