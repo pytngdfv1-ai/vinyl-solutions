@@ -38,6 +38,18 @@ class MusicBrainz {
     return c.future;
   }
 
+  /// GET JSON a MusicBrainz respetando el límite de 1 petición por segundo.
+  static Future<dynamic> getJson(Uri uri) async {
+    try {
+      return await _throttled(() async {
+        final res = await _client.get(uri, headers: headers).timeout(const Duration(seconds: 10));
+        return res.statusCode == 200 ? jsonDecode(utf8.decode(res.bodyBytes)) : null;
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
   static String _n(String s) => s
       .toLowerCase()
       .replaceAll(RegExp(r'[\(\[].*?[\)\]]'), ' ')

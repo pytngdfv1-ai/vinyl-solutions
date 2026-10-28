@@ -235,6 +235,23 @@ class VinylStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Fija la portada de un disco (la que el usuario eligió en Cover Studio).
+  Future<void> setCover(String id, String url) async {
+    _items = [for (final v in _items) v.id == id ? v.copyWith(coverUrl: url) : v];
+    notifyListeners();
+    await _save();
+  }
+
+  /// Agrega una página (imagen) al libreto del disco.
+  Future<void> addBooklet(String id, String url) async {
+    _items = [
+      for (final v in _items)
+        if (v.id == id && !v.booklet.contains(url)) v.copyWith(booklet: [...v.booklet, url]) else v,
+    ];
+    notifyListeners();
+    await _save();
+  }
+
   /// Agrega un PDF al libreto del disco (por ejemplo, uno creado desde las imágenes).
   Future<void> addPdf(String id, String url) async {
     _items = [

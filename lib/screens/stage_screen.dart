@@ -7,6 +7,7 @@ import '../data/koofr_settings.dart';
 import '../data/library_order.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
+import 'cover_studio_screen.dart';
 import '../models/vinyl.dart';
 import '../data/booklet_lite.dart';
 import '../data/classifier.dart';
@@ -808,6 +809,17 @@ class DetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.image_search),
+                    label: const Text('Buscar portada / PDF'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => CoverStudioScreen(store: store, target: v)),
+                    ),
+                  ),
                 ),
                 if (_cloudAccount(v) != null) ...[
                   const SizedBox(height: 8),
