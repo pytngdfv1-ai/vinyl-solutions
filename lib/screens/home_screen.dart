@@ -4,6 +4,7 @@ import '../audio/player_service.dart';
 import '../data/cajon.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
+import 'cover_studio_screen.dart';
 import '../models/vinyl.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
@@ -98,6 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       _push(LocalScreen(store: widget.store));
                     case 'disc':
                       addDisc(context, widget.store);
+                    case 'studio':
+                      _push(CoverStudioScreen(store: widget.store));
                     case 'backup':
                       _push(BackupScreen(store: widget.store));
                     case 'settings':
@@ -110,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuItem(value: 'koofr', child: Text('Conectar nube (Koofr)')),
                   PopupMenuItem(value: 'local', child: Text('Carpeta del teléfono')),
                   PopupMenuItem(value: 'disc', child: Text('Agregar disco a mano')),
+                  PopupMenuItem(value: 'studio', child: Text('Cover Studio (portadas y PDF)')),
                   PopupMenuDivider(),
                   PopupMenuItem(value: 'backup', child: Text('Copia de seguridad')),
                   PopupMenuItem(value: 'settings', child: Text('Ajustes de biblioteca')),
