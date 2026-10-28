@@ -8,6 +8,7 @@ import '../models/vinyl.dart';
 import 'koofr_settings.dart';
 import 'library_settings.dart';
 import 'library_sync.dart';
+import 'playlists.dart';
 import 'vinyl_store.dart';
 
 class BackupException implements Exception {
@@ -40,6 +41,7 @@ class BackupService {
           if (!v.owned) v.id,
       ],
       'classes': store.classExport(),
+      'playlists': Playlists.instance.export(),
       'cassettes': [
         for (final v in store.items)
           if (v.cassette) v.id,
@@ -110,6 +112,8 @@ class BackupService {
 
     final cassettes = (d['cassettes'] as List? ?? const []).cast<String>();
     if (cassettes.isNotEmpty) await store.markCassette(cassettes);
+    final pls = d['playlists'] as List?;
+    if (pls != null) await Playlists.instance.import(pls);
     final classes = d['classes'] as Map<String, dynamic>?;
     if (classes != null) await store.classImport(classes);
 

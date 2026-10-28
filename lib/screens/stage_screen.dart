@@ -8,6 +8,8 @@ import '../data/library_order.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
+import 'playlist_screens.dart';
+import '../data/playlists.dart';
 import 'upload_dialog.dart';
 import '../data/cloud_upload.dart';
 import '../models/vinyl.dart';
@@ -400,6 +402,14 @@ class _Controls extends StatelessWidget {
                         : _Info(title: v.title, sub: '${v.artist}  ${v.yearLabel}'),
                   ),
                   if (v.hasAudio) ...[
+                    IconButton(
+                      tooltip: 'Agregar a una playlist',
+                      icon: const Icon(Icons.playlist_add),
+                      onPressed: () => showAddToPlaylist(
+                        context,
+                        PlEntry.of(v, active ? (p.currentIndex ?? 0) : 0),
+                      ),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.skip_previous),
                       onPressed: active ? onPrev : null,

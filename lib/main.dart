@@ -6,6 +6,7 @@ import 'data/discogs.dart';
 import 'data/koofr_settings.dart';
 import 'data/library_settings.dart';
 import 'data/library_sync.dart';
+import 'data/playlists.dart';
 import 'data/vinyl_store.dart';
 import 'screens/home_screen.dart';
 import 'theme.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
   await Discogs.load();
   await BookletLite.load();
   await KoofrAccounts.load();
+  await Playlists.instance.load();
   runApp(VinylApp(store: store));
   // Sincroniza las nubes al abrir (en segundo plano).
   LibrarySync.syncAll(store);
