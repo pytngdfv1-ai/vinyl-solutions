@@ -6,6 +6,7 @@ import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
 import 'duplicates_screen.dart';
+import 'playlist_screens.dart';
 import '../models/vinyl.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
@@ -100,6 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       _push(LocalScreen(store: widget.store));
                     case 'disc':
                       addDisc(context, widget.store);
+                    case 'playlists':
+                      _push(const PlaylistsScreen());
                     case 'dups':
                       _push(DuplicatesScreen(store: widget.store));
                     case 'studio':
@@ -116,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuItem(value: 'koofr', child: Text('Conectar nube (Koofr)')),
                   PopupMenuItem(value: 'local', child: Text('Carpeta del teléfono')),
                   PopupMenuItem(value: 'disc', child: Text('Agregar disco a mano')),
+                  PopupMenuItem(value: 'playlists', child: Text('Playlists')),
                   PopupMenuItem(value: 'dups', child: Text('Duplicados')),
                   PopupMenuItem(value: 'studio', child: Text('Cover Studio (portadas y PDF)')),
                   PopupMenuDivider(),

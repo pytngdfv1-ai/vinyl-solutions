@@ -28,8 +28,11 @@ class PlayerService {
   bool _changing = false;
   bool _loading = false;
 
+  /// Playlist: los temas se encadenan sin la animación de pausa del brazo.
+  bool chain = false;
+
   /// Carga el disco y empieza a sonar. Si ya está cargado, no hace nada.
-  Future<void> start(Vinyl v, {int index = 0}) async {
+  Future<void> start(Vinyl v, {int index = 0, bool chain = false}) async {
     if (_loadedId == v.id || _loading) return;
     _loading = true;
     try {
@@ -44,6 +47,7 @@ class PlayerService {
                 : LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.headersFor(url)),
         ],
       );
+      this.chain = chain;
       _changing = false;
       _lastIndex = index;
       await player.setAudioSource(source, initialIndex: index);
@@ -75,6 +79,12 @@ class PlayerService {
   Future<void> goTrack(int i) async {
     final v = nowPlaying.value;
     if (v == null || _changing || i < 0 || i >= v.trackUrls.length) return;
+    if (chain) {
+      _lastIndex = i;
+      await player.seek(Duration.zero, index: i);
+      unawaited(player.play());
+      return;
+    }
     _changing = true;
     await player.pause(); // el brazo se levanta
     await Future.delayed(const Duration(milliseconds: 900));
@@ -90,7 +100,7 @@ class PlayerService {
     if (i == null) return;
     final prev = _lastIndex;
     _lastIndex = i;
-    if (_loadedId == null || prev == i || _changing) return;
+    if (_loadedId == null || prev == i || _changing || chain) return;
     _autoAdvance();
   }
 

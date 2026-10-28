@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../audio/player_service.dart';
+import '../audio/playlist_player.dart';
+import '../screens/dj_screen.dart';
 import '../models/vinyl.dart';
 import 'cover_art.dart';
 
@@ -23,7 +25,9 @@ class NowPlayingChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           child: InkWell(
             borderRadius: BorderRadius.circular(24),
-            onTap: () => onOpen(v),
+            onTap: () => PlaylistPlayer.isPlaylist(v)
+                ? Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DjScreen()))
+                : onOpen(v),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(5, 4, 2, 4),
               child: Row(
