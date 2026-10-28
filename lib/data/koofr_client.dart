@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -192,6 +193,29 @@ class KoofrClient {
         await _http.send(req).timeout(const Duration(seconds: 90)));
     if (res.statusCode == 200 || res.statusCode == 201 || res.statusCode == 204) return true;
     if (res.statusCode == 412) return false;
+    _fail(res.statusCode);
+  }
+
+  /// Sube un archivo del disco por streaming (sin cargarlo entero en memoria).
+  /// No pisa: devuelve false si ya existe en la nube.
+  Future<bool> putFile(List<String> dirSegs, String name, File file,
+      {String type = 'application/octet-stream'}) async {
+    final req = http.StreamedRequest('PUT', _under([...dirSegs, name]))
+      ..headers.addAll({...settings.headers, 'Content-Type': type, 'If-None-Match': '*'})
+      ..contentLength = await file.length();
+    file.openRead().listen(req.sink.add, onError: req.sink.addError, onDone: req.sink.close);
+    final res = await http.Response.fromStream(
+        await _http.send(req).timeout(const Duration(minutes: 20)));
+    if (res.statusCode == 200 || res.statusCode == 201 || res.statusCode == 204) return true;
+    if (res.statusCode == 412) return false;
+    _fail(res.statusCode);
+  }
+
+  /// Borra un archivo o carpeta de la nube (no se puede deshacer).
+  Future<void> remove(List<String> segs, {required bool isDir}) async {
+    final req = http.Request('DELETE', _under(segs, dir: isDir))..headers.addAll(settings.headers);
+    final res = await http.Response.fromStream(await _http.send(req));
+    if (res.statusCode == 200 || res.statusCode == 204 || res.statusCode == 404) return;
     _fail(res.statusCode);
   }
 
@@ -394,6 +418,8 @@ class KoofrClient {
     if (names.length >= _maxDepth) return;
     for (final d in entries.where((e) => e.isDir)) {
       if (_dirs >= _maxDirs) return;
+      // Carpeta de copias duplicadas apartadas: no es música de la biblioteca.
+      if (names.isEmpty && group == null && d.name == '_duplicados') continue;
       onProgress?.call(d.name);
       final sub = await _list(d.uri);
       if (split && names.isEmpty && group == null) {

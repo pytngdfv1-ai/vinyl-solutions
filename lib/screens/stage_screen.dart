@@ -8,6 +8,8 @@ import '../data/library_order.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
+import 'upload_dialog.dart';
+import '../data/cloud_upload.dart';
 import '../models/vinyl.dart';
 import '../data/booklet_lite.dart';
 import '../data/classifier.dart';
@@ -821,6 +823,27 @@ class DetailSheet extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (CloudUpload.isLocal(v) && KoofrAccounts.list.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.cloud_upload_outlined),
+                      label: const Text('Subir a la nube…'),
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => UploadDialog(store: store, vinyl: v),
+                        );
+                        if (ok == true && context.mounted) {
+                          Navigator.of(context)
+                            ..pop()
+                            ..pop();
+                        }
+                      },
+                    ),
+                  ),
+                ],
                 if (_cloudAccount(v) != null) ...[
                   const SizedBox(height: 8),
                   SizedBox(
