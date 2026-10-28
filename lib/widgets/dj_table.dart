@@ -3,8 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../audio/player_service.dart';
-import '../audio/playlist_player.dart';
+import '../audio/dj_feed.dart';
 import '../data/playlists.dart';
 import 'cover_art.dart';
 
@@ -12,7 +11,9 @@ import 'cover_art.dart';
 /// El plato del tema que suena gira y su brazo baja al disco; el otro plato
 /// tiene cargado el tema siguiente, quieto y con el brazo en reposo.
 class DjTable extends StatefulWidget {
-  const DjTable({super.key});
+  const DjTable({super.key, required this.feed});
+
+  final DjFeed feed;
 
   @override
   State<DjTable> createState() => _DjTableState();
@@ -44,7 +45,7 @@ class _DjTableState extends State<DjTable> with SingleTickerProviderStateMixin {
   double _xf = 0;
   double _clock = 0;
   Duration _last = Duration.zero;
-  final _audio = PlayerService.instance;
+  DjFeed get feed => widget.feed;
 
   @override
   void initState() {
@@ -62,61 +63,87 @@ class _DjTableState extends State<DjTable> with SingleTickerProviderStateMixin {
   void _onTick(Duration t) {
     final dt = math.min(0.05, (t - _last).inMicroseconds / 1e6);
     _last = t;
-    final p = _audio.player;
-    final ci = p.currentIndex ?? 0;
-    final playing = p.playing;
-    final dur = p.duration?.inMilliseconds ?? 0;
-    final prog = dur > 0 ? (p.position.inMilliseconds / dur).clamp(0.0, 1.0).toDouble() : 0.0;
+    var anyPlaying = false;
     for (var d = 0; d < 2; d++) {
-      final active = ci % 2 == d;
-      final targetSpeed = active && playing ? 1.0 : 0.0;
-      _speed[d] += (targetSpeed - _speed[d]) * math.min(1.0, dt * 3);
-      _spin[d] -= _speed[d] * dt * 3.2; // sentido antihorario, como el disco
-      final target = active ? _playAngle(prog) : _restAngle;
-      _arm[d] += (target - _arm[d]) * math.min(1.0, dt * 4);
+      final target = feed.spinning(d) ? 1.0 : 0.0;
+      if (target > 0) anyPlaying = true;
+      _speed[d] += (target - _speed[d]) * math.min(1.0, dt * 3);
+      _spin[d] -= _speed[d] * dt * 3.2 * feed.rate(d); // antihorario, como el disco
+      final armTarget = feed.armDown(d) ? _playAngle(feed.progress(d)) : _restAngle;
+      _arm[d] += (armTarget - _arm[d]) * math.min(1.0, dt * 4);
     }
-    _xf += ((ci % 2 == 0 ? 0.0 : 1.0) - _xf) * math.min(1.0, dt * 3);
-    if (playing) _clock += dt;
+    _xf += (feed.xf - _xf) * math.min(1.0, dt * (feed.interactive ? 14 : 3));
+    if (anyPlaying) _clock += dt;
     _tick.value++;
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<PlSession?>(
-      valueListenable: PlaylistPlayer.instance.session,
-      builder: (_, session, __) => StreamBuilder<int?>(
-        stream: _audio.player.currentIndexStream,
-        initialData: _audio.player.currentIndex,
-        builder: (_, ix) {
-          final ci = ix.data ?? 0;
-          final list = session?.entries ?? const <PlEntry>[];
-          PlEntry? at(int i) => i >= 0 && i < list.length ? list[i] : null;
-          final entries = [
-            ci % 2 == 0 ? at(ci) : at(ci + 1),
-            ci % 2 == 1 ? at(ci) : at(ci + 1),
-          ];
-          return LayoutBuilder(
-            builder: (_, c) {
-              final s = math.min(c.maxWidth / _dw, c.maxHeight / _dh);
-              return Center(
-                child: SizedBox(
-                  width: _dw * s,
-                  height: _dh * s,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: CustomPaint(painter: _TablePainter(this, s)),
-                      ),
-                      for (var d = 0; d < 2; d++) ..._deck(d, s, entries[d]),
-                    ],
-                  ),
+    return AnimatedBuilder(
+      animation: feed,
+      builder: (_, __) {
+        final entries = [feed.entry(0), feed.entry(1)];
+        return LayoutBuilder(
+          builder: (_, c) {
+            final s = math.min(c.maxWidth / _dw, c.maxHeight / _dh);
+            return Center(
+              child: SizedBox(
+                width: _dw * s,
+                height: _dh * s,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: CustomPaint(painter: _TablePainter(this, s))),
+                    for (var d = 0; d < 2; d++) ..._deck(d, s, entries[d]),
+                    if (feed.interactive) ..._touch(s),
+                  ],
                 ),
-              );
-            },
-          );
-        },
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
+  }
+
+  /// Zonas táctiles: start/stop, pitch de cada plato y crossfader.
+  List<Widget> _touch(double s) {
+    final out = <Widget>[];
+    for (var d = 0; d < 2; d++) {
+      final x0 = d == 0 ? 0.0 : _deck2X;
+      out.add(Positioned(
+        left: (x0 + 346) * s,
+        top: 250 * s,
+        width: 36 * s,
+        height: 36 * s,
+        child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => feed.onPlatter(d)),
+      ));
+      void pitchAt(Offset local) => feed.onPitch(d, ((227 - (170 + local.dy / s)) / 45).clamp(-1.0, 1.0).toDouble());
+      out.add(Positioned(
+        left: (x0 + 372) * s,
+        top: 170 * s,
+        width: 40 * s,
+        height: 114 * s,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (t) => pitchAt(t.localPosition),
+          onVerticalDragUpdate: (t) => pitchAt(t.localPosition),
+          onDoubleTap: () => feed.onPitch(d, 0),
+        ),
+      ));
+    }
+    void xfAt(Offset local) => feed.onXf(((30 + local.dx / s) - 45) / 135);
+    out.add(Positioned(
+      left: (_mixX + 30) * s,
+      top: 276 * s,
+      width: 165 * s,
+      height: 36 * s,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (t) => xfAt(t.localPosition),
+        onHorizontalDragUpdate: (t) => xfAt(t.localPosition),
+      ),
+    ));
+    return out;
   }
 
   List<Widget> _deck(int d, double s, PlEntry? e) {
@@ -135,7 +162,9 @@ class _DjTableState extends State<DjTable> with SingleTickerProviderStateMixin {
         top: (_center.dy - R) * s,
         width: 2 * R * s,
         height: 2 * R * s,
-        child: AnimatedBuilder(
+        child: GestureDetector(
+          onTap: feed.interactive ? () => feed.onPlatter(d) : null,
+          child: AnimatedBuilder(
           animation: _tick,
           child: Stack(
             alignment: Alignment.center,
@@ -150,6 +179,7 @@ class _DjTableState extends State<DjTable> with SingleTickerProviderStateMixin {
             ],
           ),
           builder: (_, child) => Transform.rotate(angle: _spin[d], child: child),
+        ),
         ),
       ),
       Positioned(
@@ -219,7 +249,8 @@ class _TablePainter extends CustomPainter {
       final y = 182 + i * 5.6;
       canvas.drawLine(Offset(383, y), Offset(i % 4 == 0 ? 392 : 388, y), tick);
     }
-    canvas.drawRect(const Rect.fromLTWH(382, 226, 18, 3), Paint()..color = const Color(0xFFE53935));
+    final py = 227 - st.feed.pitch(x0 == 0 ? 0 : 1) * 45;
+    canvas.drawRect(Rect.fromLTWH(382, py - 1.5, 18, 3), Paint()..color = const Color(0xFFE53935));
     canvas.restore();
   }
 
