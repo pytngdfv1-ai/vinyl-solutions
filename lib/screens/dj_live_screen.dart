@@ -91,6 +91,8 @@ class _DjLiveScreenState extends State<DjLiveScreen> {
               ),
               const Text('Auto-mix', style: TextStyle(fontSize: 12)),
               Switch(value: _dj.autoMix, onChanged: _dj.setAuto),
+              const Text('AutoDJ', style: TextStyle(fontSize: 12)),
+              Switch(value: _dj.autoDj, onChanged: _dj.setAutoDj),
               PopupMenuButton<int>(
                 tooltip: 'Duración del fundido',
                 initialValue: _dj.fadeSecs,
@@ -134,7 +136,9 @@ class _DeckBar extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('PLATO ${d == 0 ? 'A' : 'B'}', style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                Text(
+                    'PLATO ${d == 0 ? 'A' : 'B'}${(dk.info?.bpm ?? 0) > 0 ? ' · ${dk.info!.bpm.round()} BPM' : ''}',
+                    style: const TextStyle(fontSize: 10, color: Colors.white54)),
                 Text(dk.entry?.title ?? '—', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
