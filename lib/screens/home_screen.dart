@@ -5,6 +5,7 @@ import '../data/cajon.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
+import 'about_screen.dart';
 import 'duplicates_screen.dart';
 import 'playlist_screens.dart';
 import '../models/vinyl.dart';
@@ -101,6 +102,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       _push(LocalScreen(store: widget.store));
                     case 'disc':
                       addDisc(context, widget.store);
+                    case 'about':
+                      _push(const AboutScreen());
                     case 'playlists':
                       _push(const PlaylistsScreen());
                     case 'dups':
@@ -125,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuDivider(),
                   PopupMenuItem(value: 'backup', child: Text('Copia de seguridad')),
                   PopupMenuItem(value: 'settings', child: Text('Ajustes de biblioteca')),
+                  PopupMenuItem(value: 'about', child: Text('Acerca de')),
                   PopupMenuItem(value: 'clear', child: Text('Borrar todo')),
                 ],
               ),
