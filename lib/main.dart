@@ -34,7 +34,7 @@ class VinylApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VinylSolutions',
+      title: 'Mi Biblioteca',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       home: HomeScreen(store: store),

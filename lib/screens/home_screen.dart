@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: AppColors.ink,
           appBar: AppBar(
             backgroundColor: AppColors.ink,
-            title: const Text('VinylSolutions'),
+            title: const Text('Mi Biblioteca'),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(2),
               child: ValueListenableBuilder<String?>(

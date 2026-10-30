@@ -158,7 +158,7 @@ class _CrateScreenState extends State<CrateScreen> {
                   const Padding(
                     padding: EdgeInsets.all(20),
                     child: Text(
-                      'VinylSolutions',
+                      'Mi Biblioteca',
                       style: TextStyle(fontFamily: titleFont, fontSize: 22),
                     ),
                   ),
