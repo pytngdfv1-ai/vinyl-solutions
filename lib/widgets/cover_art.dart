@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../data/koofr_settings.dart';
+import '../data/thumb_cache.dart';
 import '../models/vinyl.dart';
 
 /// Imagen de portada: archivo local (file://) o red (Koofr / internet).
@@ -21,15 +22,70 @@ Widget buildCoverImage(
       errorBuilder: (_, __, ___) => fallback,
     );
   }
-  return Image.network(
-    url,
-    headers: KoofrSettings.headersFor(url),
-    fit: fit,
-    cacheWidth: cacheWidth,
-    gaplessPlayback: true,
-    errorBuilder: (_, __, ___) => fallback,
-    loadingBuilder: (_, child, p) => p == null ? child : fallback,
-  );
+  return _CachedNet(url: url, cacheWidth: cacheWidth, fit: fit, fallback: fallback);
+}
+
+/// Portada de la nube: se muestra al instante y queda como miniatura en disco para la próxima vez.
+class _CachedNet extends StatefulWidget {
+  const _CachedNet({required this.url, required this.cacheWidth, required this.fit, required this.fallback});
+  final String url;
+  final int cacheWidth;
+  final BoxFit fit;
+  final Widget fallback;
+
+  @override
+  State<_CachedNet> createState() => _CachedNetState();
+}
+
+class _CachedNetState extends State<_CachedNet> {
+  File? _file;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CachedNet old) {
+    super.didUpdateWidget(old);
+    if (old.url != widget.url) {
+      _file = null;
+      _failed = false;
+      _resolve();
+    }
+  }
+
+  Future<void> _resolve() async {
+    final url = widget.url;
+    final f = await ThumbCache.get(url);
+    if (!mounted || url != widget.url) return;
+    setState(() {
+      _file = f;
+      _failed = f == null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = _file;
+    if (f != null) {
+      return Image.file(f,
+          fit: widget.fit, cacheWidth: widget.cacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => widget.fallback);
+    }
+    if (!_failed) return widget.fallback;
+    // Sin miniatura (p. ej. sin conexión al primer intento): se intenta directo por red.
+    return Image.network(
+      widget.url,
+      headers: KoofrSettings.headersFor(widget.url),
+      fit: widget.fit,
+      cacheWidth: widget.cacheWidth,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => widget.fallback,
+      loadingBuilder: (_, child, p) => p == null ? child : widget.fallback,
+    );
+  }
 }
 
 Color hueColor(double hue, double s, double l) =>

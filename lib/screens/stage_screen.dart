@@ -833,6 +833,36 @@ class DetailSheet extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (v.coverUrl != null) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.hide_image_outlined),
+                      label: const Text('Portada equivocada: quitar'),
+                      onPressed: () async {
+                        final nav = Navigator.of(context);
+                        final r = await showDialog<String>(
+                          context: context,
+                          builder: (d) => AlertDialog(
+                            title: const Text('¿Quitar la portada?'),
+                            content: Text('Se quita la portada de “${v.title}” de la app. Los archivos de la carpeta no se tocan.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancelar')),
+                              TextButton(onPressed: () => Navigator.pop(d, 'only'), child: const Text('Solo quitar')),
+                              FilledButton(onPressed: () => Navigator.pop(d, 'search'), child: const Text('Quitar y buscar otra')),
+                            ],
+                          ),
+                        );
+                        if (r == null) return;
+                        await store.clearCover(v.id);
+                        if (r == 'search') {
+                          await nav.push(MaterialPageRoute(builder: (_) => CoverStudioScreen(store: store, target: v)));
+                        }
+                      },
+                    ),
+                  ),
+                ],
                 if (CloudUpload.isLocal(v) && KoofrAccounts.list.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   SizedBox(

@@ -237,7 +237,14 @@ class VinylStore extends ChangeNotifier {
 
   /// Fija la portada de un disco (la que el usuario eligió en Cover Studio).
   Future<void> setCover(String id, String url) async {
-    _items = [for (final v in _items) v.id == id ? v.copyWith(coverUrl: url) : v];
+    _items = [for (final v in _items) v.id == id ? v.copyWith(coverUrl: url, coverLocked: true) : v];
+    notifyListeners();
+    await _save();
+  }
+
+  /// Quita la portada (estaba mal puesta): queda bloqueada para que el escaneo no la vuelva a poner.
+  Future<void> clearCover(String id) async {
+    _items = [for (final v in _items) v.id == id ? v.copyWith(clearCover: true, coverLocked: true) : v];
     notifyListeners();
     await _save();
   }

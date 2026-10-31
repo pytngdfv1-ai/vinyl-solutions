@@ -94,12 +94,13 @@ Future<ScanResult> buildAlbums(
       final d = drafts[i];
       onProgress?.call(d.folderAlbum);
       final old = reuse[d.id];
-      if (old != null && old.coverUrl != null && old.year > 0 && old.trackUrls.length == d.trackUrls.length) {
-        // Ya estaba en la biblioteca: se conserva portada y datos, se refrescan archivos.
+      if (old != null && (old.coverUrl != null || old.coverLocked || old.year > 0) && old.trackUrls.length == d.trackUrls.length) {
+        // Incremental: ya estaba en la biblioteca, se conservan portada y datos (sin buscar en internet)
+        // y solo se refrescan los archivos.
         built[i] = old.copyWith(
           tracks: [for (final t in d.trackFiles) trackTitle(t, artist: old.artist)],
           trackUrls: d.trackUrls,
-          coverUrl: d.folderImageUrl,
+          coverUrl: old.coverLocked ? old.coverUrl : (d.folderImageUrl ?? old.coverUrl),
           booklet: d.bookletImages,
           pdfs: d.pdfs,
         );
