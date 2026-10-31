@@ -36,7 +36,7 @@ class DjEngine extends ChangeNotifier implements DjFeed {
   bool autoMix = true;
 
   /// AutoDJ: analiza el tempo, ordena por tempo, ajusta el siguiente al que suena y salta el silencio inicial.
-  bool autoDj = true;
+  bool autoDj = false;
   final List<bool> _loadingDeck = [false, false];
   int fadeSecs = 8;
   String? error;
