@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
+import 'audio/app_audio.dart';
 import 'data/booklet_lite.dart';
 import 'data/cajon.dart';
 import 'data/discogs.dart';
@@ -21,7 +23,12 @@ Future<void> main() async {
   await BookletLite.load();
   await KoofrAccounts.load();
   await Playlists.instance.load();
+  try {
+    await AppAudio.init();
+  } catch (_) {}
   runApp(VinylApp(store: store));
+  // Android 13+: permiso para mostrar los controles en la notificación.
+  Permission.notification.request();
   // Sincroniza las nubes al abrir (en segundo plano).
   LibrarySync.syncAll(store);
 }

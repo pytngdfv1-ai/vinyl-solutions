@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../audio/app_audio.dart';
 import '../audio/dj_engine.dart';
 import '../data/playlists.dart';
 import '../widgets/cover_art.dart';
@@ -31,6 +32,7 @@ class _DjLiveScreenState extends State<DjLiveScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     final q = [...widget.playlist.entries];
     if (widget.shuffle) q.shuffle(Random());
+    AppAudio.instance?.attachDj(_dj);
     _dj.start(q).then((_) {
       if (mounted) setState(() => _ready = true);
     });
@@ -38,6 +40,7 @@ class _DjLiveScreenState extends State<DjLiveScreen> {
 
   @override
   void dispose() {
+    AppAudio.instance?.detachDj();
     _dj.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
