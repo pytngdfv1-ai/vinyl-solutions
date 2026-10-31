@@ -8,6 +8,7 @@ import 'cover_studio_screen.dart';
 import 'about_screen.dart';
 import 'duplicates_screen.dart';
 import 'playlist_screens.dart';
+import 'search_screen.dart';
 import '../models/vinyl.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
@@ -91,6 +92,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             actions: [
+              IconButton(
+                tooltip: 'Buscar',
+                icon: const Icon(Icons.search),
+                onPressed: () => _push(SearchScreen(store: widget.store)),
+              ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.add_circle_outline),
                 tooltip: 'Agregar',

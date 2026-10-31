@@ -246,6 +246,27 @@ class DjEngine extends ChangeNotifier implements DjFeed {
     }
   }
 
+  // ---------- notificación / pantalla bloqueada ----------
+  int get activeDeck => _xf < 0.5 ? 0 : 1;
+  bool get anyPlaying => decks.any((d) => d.player.playing);
+  List<int> _resume = [];
+
+  Future<void> pauseAll() async {
+    _resume = [for (var i = 0; i < 2; i++) if (decks[i].player.playing) i];
+    for (final d in decks) {
+      await d.player.pause();
+    }
+    notifyListeners();
+  }
+
+  Future<void> resumeAll() async {
+    final l = _resume.isEmpty ? [activeDeck] : _resume;
+    for (final i in l) {
+      if (decks[i].entry != null) unawaited(decks[i].player.play());
+    }
+    notifyListeners();
+  }
+
   // ---------- mandos ----------
   Future<void> toggle(int d) async {
     final dk = decks[d];
