@@ -5,6 +5,7 @@ import '../data/cajon.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
+import 'pending_screen.dart';
 import 'about_screen.dart';
 import 'duplicates_screen.dart';
 import 'playlist_screens.dart';
@@ -114,6 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       _push(const PlaylistsScreen());
                     case 'dups':
                       _push(DuplicatesScreen(store: widget.store));
+                    case 'pending':
+                      _push(PendingScreen(store: widget.store));
                     case 'studio':
                       _push(CoverStudioScreen(store: widget.store));
                     case 'backup':
@@ -130,6 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuItem(value: 'disc', child: Text('Agregar disco a mano')),
                   PopupMenuItem(value: 'playlists', child: Text('Playlists')),
                   PopupMenuItem(value: 'dups', child: Text('Duplicados')),
+                  PopupMenuItem(value: 'pending', child: Text('Pendientes (sin portada o PDF)')),
                   PopupMenuItem(value: 'studio', child: Text('Cover Studio (portadas y PDF)')),
                   PopupMenuDivider(),
                   PopupMenuItem(value: 'backup', child: Text('Copia de seguridad')),

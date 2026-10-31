@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../models/vinyl.dart';
 import 'album_builder.dart';
 import 'flac_meta.dart';
 import 'library_settings.dart';
@@ -20,7 +21,8 @@ class LocalScanner {
 
   String diagnostic = '';
 
-  Future<ScanResult> scan(String rootPath, {void Function(String)? onProgress}) async {
+  Future<ScanResult> scan(String rootPath,
+      {void Function(String)? onProgress, Map<String, Vinyl> reuse = const {}}) async {
     final root = Directory(rootPath);
     if (!await root.exists()) {
       throw const LocalException('No se puede abrir la carpeta');
@@ -138,7 +140,7 @@ class LocalScanner {
       ));
     }
 
-    final result = await buildAlbums(drafts, skippedBefore: skipped, onProgress: onProgress);
+    final result = await buildAlbums(drafts, skippedBefore: skipped, onProgress: onProgress, reuse: reuse);
     diagnostic = 'Vi $files archivos en "$rootName". '
         'Álbumes completos: ${result.albums.length}.';
     return result;

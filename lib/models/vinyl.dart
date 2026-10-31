@@ -18,6 +18,7 @@ class Vinyl {
     this.lang,
     this.langManual = false,
     this.coverManual = false,
+    this.coverLocked = false,
   });
 
   final String id;
@@ -53,6 +54,9 @@ class Vinyl {
   final bool langManual;
   final bool coverManual;
 
+  /// El usuario eligió o quitó la portada: los re-escaneos no la cambian.
+  final bool coverLocked;
+
   /// Separador generado entre artistas (no es un disco real).
   bool get isDivider => id.startsWith('sep_');
 
@@ -74,6 +78,8 @@ class Vinyl {
     bool clearLang = false,
     bool? langManual,
     bool? coverManual,
+    bool? coverLocked,
+    bool clearCover = false,
   }) =>
       Vinyl(
         id: id,
@@ -84,7 +90,7 @@ class Vinyl {
         tracks: tracks ?? this.tracks,
         owned: owned ?? this.owned,
         trackUrls: trackUrls ?? this.trackUrls,
-        coverUrl: coverUrl ?? this.coverUrl,
+        coverUrl: clearCover ? null : (coverUrl ?? this.coverUrl),
         booklet: booklet ?? this.booklet,
         pdfs: pdfs ?? this.pdfs,
         genre: genre ?? this.genre,
@@ -94,6 +100,7 @@ class Vinyl {
         lang: clearLang ? null : (lang ?? this.lang),
         langManual: langManual ?? this.langManual,
         coverManual: coverManual ?? this.coverManual,
+        coverLocked: coverLocked ?? this.coverLocked,
       );
 
   Map<String, dynamic> toJson() => {
@@ -115,6 +122,7 @@ class Vinyl {
         'lang': lang,
         'langManual': langManual,
         'coverManual': coverManual,
+        'coverLocked': coverLocked,
       };
 
   factory Vinyl.fromJson(Map<String, dynamic> j) => Vinyl(
@@ -137,5 +145,6 @@ class Vinyl {
         langManual: j['langManual'] as bool? ?? false,
         // Biblioteca anterior: un cover marcado antes era siempre manual.
         coverManual: j['coverManual'] as bool? ?? (j['cassette'] as bool? ?? false),
+        coverLocked: j['coverLocked'] as bool? ?? false,
       );
 }

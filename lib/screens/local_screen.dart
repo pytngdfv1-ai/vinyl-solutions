@@ -51,8 +51,13 @@ class _LocalScreenState extends State<LocalScreen> {
       }
       setState(() => _status = 'Leyendo carpeta…');
       final scanner = LocalScanner();
+      final reuse = {
+        for (final v in widget.store.items)
+          if ((v.source ?? '').startsWith('local')) v.id: v,
+      };
       final result = await scanner.scan(
         path,
+        reuse: reuse,
         onProgress: (n) {
           if (mounted) setState(() => _status = 'Leyendo $n…');
         },
