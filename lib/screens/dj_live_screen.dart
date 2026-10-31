@@ -1,10 +1,8 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../audio/app_audio.dart';
+import '../audio/dj_session.dart';
 import '../audio/dj_engine.dart';
 import '../data/playlists.dart';
 import '../widgets/cover_art.dart';
@@ -13,35 +11,27 @@ import '../widgets/dj_table.dart';
 /// DJ en vivo (horizontal): dos platos que suenan a la vez, crossfader, pitch por plato
 /// y mezcla automática con solape. Toca los controles de la mesa o los botones de abajo.
 class DjLiveScreen extends StatefulWidget {
-  const DjLiveScreen({super.key, required this.playlist, required this.shuffle});
-  final Playlist playlist;
-  final bool shuffle;
+  const DjLiveScreen({super.key, required this.engine, required this.name});
+  final DjEngine engine;
+  final String name;
 
   @override
   State<DjLiveScreen> createState() => _DjLiveScreenState();
 }
 
 class _DjLiveScreenState extends State<DjLiveScreen> {
-  final _dj = DjEngine();
-  bool _ready = false;
+  late final DjEngine _dj = widget.engine;
 
   @override
   void initState() {
     super.initState();
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    final q = [...widget.playlist.entries];
-    if (widget.shuffle) q.shuffle(Random());
-    AppAudio.instance?.attachDj(_dj);
-    _dj.start(q).then((_) {
-      if (mounted) setState(() => _ready = true);
-    });
   }
 
   @override
   void dispose() {
-    AppAudio.instance?.detachDj();
-    _dj.dispose();
+    // Al salir, la música sigue: la sesión vive en DjSession (se detiene con el botón de stop).
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -58,7 +48,10 @@ class _DjLiveScreenState extends State<DjLiveScreen> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: _ready ? DjTable(feed: _dj) : const Center(child: CircularProgressIndicator()),
+                child: AnimatedBuilder(
+                  animation: _dj,
+                  builder: (_, __) => _dj.started ? DjTable(feed: _dj) : const Center(child: CircularProgressIndicator()),
+                ),
               ),
             ),
             SizedBox(
@@ -83,10 +76,13 @@ class _DjLiveScreenState extends State<DjLiveScreen> {
           height: 44,
           child: Row(
             children: [
-              IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.of(context).pop()),
+              IconButton(
+                  tooltip: 'Volver (la música sigue)',
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.of(context).pop()),
               Expanded(
                 child: Text(
-                  'DJ en vivo · ${widget.playlist.name}',
+                  'DJ en vivo · ${widget.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700),
@@ -107,6 +103,15 @@ class _DjLiveScreenState extends State<DjLiveScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Text('${_dj.fadeSecs} s', style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
+              ),
+              IconButton(
+                tooltip: 'Detener el DJ',
+                icon: const Icon(Icons.stop_circle_outlined),
+                onPressed: () async {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  await DjSession.stop();
+                },
               ),
               if (_dj.error != null)
                 Padding(

@@ -31,9 +31,13 @@ class PlayerService {
   /// Playlist: los temas se encadenan sin la animación de pausa del brazo.
   bool chain = false;
 
+  /// Se llama antes de cargar un disco (p. ej. para cerrar una sesión de DJ en vivo).
+  static Future<void> Function()? beforeStart;
+
   /// Carga el disco y empieza a sonar. Si ya está cargado, no hace nada.
   Future<void> start(Vinyl v, {int index = 0, bool chain = false}) async {
     if (_loadedId == v.id || _loading) return;
+    await beforeStart?.call();
     _loading = true;
     try {
       if (!v.trackUrls.first.startsWith('file:')) await _preflight(v.trackUrls.first);
