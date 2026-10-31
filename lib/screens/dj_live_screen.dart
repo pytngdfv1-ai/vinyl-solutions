@@ -187,37 +187,44 @@ class _Queue extends StatelessWidget {
         }
         return ListView.separated(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (_, i) {
             final tag = items[i].$1;
             final e = items[i].$2;
             final deck = tag == 'A' || tag == 'B';
-            return SizedBox(
-              width: 120,
-              child: Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                        border: Border.all(color: deck ? const Color(0xFFE8C14A) : Colors.white12, width: deck ? 2 : 1)),
-                    child: CoverArt(vinyl: e.asVinyl(), radius: 0),
-                  ),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(deck ? 'PLATO $tag' : 'COLA $tag',
-                            style: TextStyle(fontSize: 9, color: deck ? const Color(0xFFE8C14A) : Colors.white38)),
-                        Text(e.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      ],
+            return GestureDetector(
+              onTap: () => ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text('${e.title} · ${e.artist}'),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  width: 420,
+                )),
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                    border: Border.all(color: deck ? const Color(0xFFE8C14A) : Colors.white12, width: deck ? 2 : 1)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CoverArt(vinyl: e.asVinyl(), radius: 0),
+                    Positioned(
+                      left: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        color: Colors.black87,
+                        child: Text(tag,
+                            style: TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.w700, color: deck ? const Color(0xFFE8C14A) : Colors.white70)),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },

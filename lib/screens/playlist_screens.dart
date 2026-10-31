@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../audio/playlist_player.dart';
 import '../data/playlists.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
 import 'dj_live_screen.dart';
-import 'dj_screen.dart';
 
 Future<String?> _askName(BuildContext context, {String initial = '', String title = 'Nombre de la playlist'}) {
   final c = TextEditingController(text: initial);
@@ -126,15 +124,11 @@ class PlaylistScreen extends StatelessWidget {
   const PlaylistScreen({super.key, required this.id});
   final String id;
 
+  /// Siempre en el DJ en vivo: dos platos que se mezclan.
   Future<void> _play(BuildContext context, Playlist p, {required bool shuffle}) async {
-    final nav = Navigator.of(context);
-    final msg = ScaffoldMessenger.of(context);
-    try {
-      await PlaylistPlayer.instance.play(p, shuffle: shuffle);
-      await nav.push(MaterialPageRoute<void>(builder: (_) => const DjScreen()));
-    } catch (e) {
-      msg.showSnackBar(SnackBar(content: Text('No se pudo reproducir: $e')));
-    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DjLiveScreen(playlist: p, shuffle: shuffle)),
+    );
   }
 
   @override
@@ -202,35 +196,6 @@ class PlaylistScreen extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.tonalIcon(
-                    icon: const Icon(Icons.album),
-                    label: const Text('DJ en vivo (mezcla real)'),
-                    onPressed: p.entries.length < 2
-                        ? null
-                        : () async {
-                            final shuffle = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => SimpleDialog(
-                                title: const Text('DJ en vivo'),
-                                children: [
-                                  SimpleDialogOption(
-                                      onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Aleatorio')),
-                                  SimpleDialogOption(
-                                      onPressed: () => Navigator.of(ctx).pop(false), child: const Text('En orden')),
-                                ],
-                              ),
-                            );
-                            if (shuffle == null || !context.mounted) return;
-                            await Navigator.of(context).push(MaterialPageRoute<void>(
-                                builder: (_) => DjLiveScreen(playlist: p, shuffle: shuffle)));
-                          },
-                  ),
                 ),
               ),
               Expanded(
