@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../audio/dj_session.dart';
 import '../data/playlists.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
@@ -124,11 +125,11 @@ class PlaylistScreen extends StatelessWidget {
   const PlaylistScreen({super.key, required this.id});
   final String id;
 
-  /// Siempre en el DJ en vivo: dos platos que se mezclan.
+  /// Siempre en el DJ en vivo: dos platos que se mezclan. La música sigue al salir de la pantalla.
   Future<void> _play(BuildContext context, Playlist p, {required bool shuffle}) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => DjLiveScreen(playlist: p, shuffle: shuffle)),
-    );
+    final nav = Navigator.of(context);
+    final e = await DjSession.begin(p, shuffle: shuffle);
+    await nav.push(MaterialPageRoute<void>(builder: (_) => DjLiveScreen(engine: e, name: p.name)));
   }
 
   @override

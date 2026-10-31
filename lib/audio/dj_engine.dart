@@ -41,6 +41,9 @@ class DjEngine extends ChangeNotifier implements DjFeed {
   int fadeSecs = 8;
   String? error;
 
+  /// Ya cargó los dos primeros temas.
+  bool started = false;
+
   bool _mixing = false;
   double _mixFrom = 0, _mixTo = 0;
   DateTime _mixStart = DateTime.now();
@@ -59,6 +62,8 @@ class DjEngine extends ChangeNotifier implements DjFeed {
     _applyVolumes();
     if (decks[0].entry != null) unawaited(decks[0].player.play());
     _timer = Timer.periodic(const Duration(milliseconds: 80), (_) => _tick());
+    notifyListeners();
+    started = true;
     notifyListeners();
     unawaited(_load(1)); // el plato B se prepara mientras suena A
   }
@@ -345,12 +350,17 @@ class DjEngine extends ChangeNotifier implements DjFeed {
   @override
   void onPitch(int d, double v) => setPitch(d, v);
 
-  @override
-  void dispose() {
+  /// Detiene todo y libera los reproductores (sin destruir el notificador, por si aún lo escucha una pantalla).
+  void shutdown() {
     _timer?.cancel();
     for (final d in decks) {
       d.player.dispose();
     }
+  }
+
+  @override
+  void dispose() {
+    shutdown();
     super.dispose();
   }
 }
