@@ -7,6 +7,8 @@ import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
 import 'pending_screen.dart';
 import 'new_folder_dialog.dart';
+import '../data/ui_settings.dart';
+import '../widgets/ring_360.dart';
 import '../data/koofr_settings.dart';
 import 'about_screen.dart';
 import 'duplicates_screen.dart';
@@ -41,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openCajon(Cajon c) {
-    if (c.kind == CajonKind.covers || c.kind == CajonKind.singles) {
+    if (!UiSettings.libRing.value && (c.kind == CajonKind.covers || c.kind == CajonKind.singles)) {
       _push(CoversScreen(store: widget.store, cajon: c));
     } else {
       _push(CrateScreen(store: widget.store, cajon: c, title: c.name));
@@ -71,6 +73,31 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
+  /// Menú principal en anillo 360°: cada biblioteca es una tarjeta que gira alrededor de ti.
+  Widget _ring(List<Cajon> cajones, List<Vinyl> all) {
+    final lists = [
+      for (final c in cajones)
+        all.where(c.matches).toList()..sort((a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase())),
+    ];
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(0, -0.1),
+          radius: 1.0,
+          colors: [Color(0xFF1B1B22), Color(0xFF050507)],
+        ),
+      ),
+      child: Ring360(
+        count: cajones.length,
+        aspect: 0.86,
+        itemBuilder: (_, i) => _HomeCard(label: cajones[i].name, covers: lists[i]),
+        onFront: (i) => _openCajon(cajones[i]),
+        onLongPressFront: (i) => _rename(cajones[i]),
+        caption: (i) => (cajones[i].name, '${lists[i].length} · mantén pulsado para renombrar'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -95,6 +122,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             actions: [
+              ValueListenableBuilder<bool>(
+                valueListenable: UiSettings.homeRing,
+                builder: (_, ring, __) => IconButton(
+                  tooltip: ring ? 'Menú clásico' : 'Menú 360°',
+                  icon: Icon(ring ? Icons.grid_view : Icons.threed_rotation),
+                  onPressed: () => UiSettings.setHome(!ring),
+                ),
+              ),
               IconButton(
                 tooltip: 'Buscar',
                 icon: const Icon(Icons.search),
@@ -165,7 +200,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 )
-              : GridView.count(
+              : ValueListenableBuilder<bool>(
+                  valueListenable: UiSettings.homeRing,
+                  builder: (context, ring, _) => ring ? _ring(cajones, all) : GridView.count(
                   crossAxisCount: 2,
                   padding: const EdgeInsets.all(16),
                   crossAxisSpacing: 16,
@@ -191,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onLongPress: () => _rename(c),
                         ),
                   ],
-                ),
+                )),
           bottomNavigationBar: ValueListenableBuilder<Vinyl?>(
             valueListenable: PlayerService.instance.nowPlaying,
             builder: (_, v, __) => v == null
@@ -516,6 +553,55 @@ class _CabinetTile extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Tarjeta de una biblioteca en el anillo: cuatro portadas y el nombre.
+class _HomeCard extends StatelessWidget {
+  const _HomeCard({required this.label, required this.covers});
+
+  final String label;
+  final List<Vinyl> covers;
+
+  @override
+  Widget build(BuildContext context) {
+    final withArt = covers.where((v) => v.coverUrl != null).toList();
+    final show = (withArt.length >= 4 ? withArt : covers).take(4).toList();
+    Widget cell(int i) => Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: i < show.length
+                ? ClipRRect(borderRadius: BorderRadius.circular(4), child: CoverArt(vinyl: show[i], radius: 0))
+                : const SizedBox.shrink(),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17171C),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(child: Row(children: [cell(0), cell(1)])),
+                Expanded(child: Row(children: [cell(2), cell(3)])),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(label,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
         ],
       ),
     );

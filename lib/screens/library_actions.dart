@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/ui_settings.dart';
+
 import '../audio/player_service.dart';
 import '../data/booklet_lite.dart';
 import '../data/discogs.dart';
@@ -56,6 +58,28 @@ Future<void> showLibrarySettings(BuildContext context) async {
               divisions: 14,
               label: '${value.round()}',
               onChanged: (v) => setLocal(() => value = v),
+            ),
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Menú principal en 360°'),
+              subtitle: const Text('Apagado = menú clásico de cajones', style: TextStyle(fontSize: 12)),
+              value: UiSettings.homeRing.value,
+              onChanged: (x) {
+                UiSettings.setHome(x);
+                setLocal(() {});
+              },
+            ),
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Dentro de cada biblioteca en 360°'),
+              subtitle: const Text('Apagado = caja de discos clásica', style: TextStyle(fontSize: 12)),
+              value: UiSettings.libRing.value,
+              onChanged: (x) {
+                UiSettings.setLib(x);
+                setLocal(() {});
+              },
             ),
             SwitchListTile(
               dense: true,

@@ -10,6 +10,8 @@ import '../data/vinyl_store.dart';
 import '../models/vinyl.dart';
 import '../widgets/now_playing_chip.dart';
 import '../widgets/crate_view.dart';
+import '../widgets/library_ring.dart';
+import '../data/ui_settings.dart';
 import 'koofr_screen.dart';
 import 'local_screen.dart';
 import 'library_actions.dart';
@@ -162,6 +164,16 @@ class _CrateScreenState extends State<CrateScreen> {
                       style: TextStyle(fontFamily: titleFont, fontSize: 22),
                     ),
                   ),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: UiSettings.libRing,
+                    builder: (_, ring, __) => SwitchListTile(
+                      secondary: const Icon(Icons.threed_rotation),
+                      title: const Text('Vista 360°'),
+                      subtitle: const Text('Apagado = caja de discos'),
+                      value: ring,
+                      onChanged: UiSettings.setLib,
+                    ),
+                  ),
                   ListTile(
                     leading: const Icon(Icons.album),
                     title: const Text('Catálogo completo'),
@@ -248,12 +260,25 @@ class _CrateScreenState extends State<CrateScreen> {
             fit: StackFit.expand,
             children: [
               Positioned.fill(
-                child: CrateView(
-                  key: ValueKey('$_filter|$_genre|$_lib'),
-                  emptyText: 'No hay nada en "${widget.title}"',
-                  items: items,
-                  onPick: _open,
-                  onLongPress: _confirmDelete,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: UiSettings.libRing,
+                  builder: (context, ring, _) => ring
+                      ? LibraryRing(
+                          key: ValueKey('ring|$_filter|$_genre|$_lib'),
+                          emptyText: 'No hay nada en "${widget.title}"',
+                          items: widget.cajon.kind == CajonKind.covers
+                              ? ([...filtered]..sort((a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase())))
+                              : [for (final v in items) if (!v.isDivider) v],
+                          onPick: _open,
+                          onLongPress: _confirmDelete,
+                        )
+                      : CrateView(
+                          key: ValueKey('$_filter|$_genre|$_lib'),
+                          emptyText: 'No hay nada en "${widget.title}"',
+                          items: items,
+                          onPick: _open,
+                          onLongPress: _confirmDelete,
+                        ),
                 ),
               ),
               Positioned(

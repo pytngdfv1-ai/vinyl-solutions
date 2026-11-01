@@ -11,6 +11,7 @@ import 'data/koofr_settings.dart';
 import 'data/library_settings.dart';
 import 'data/library_sync.dart';
 import 'data/playlists.dart';
+import 'data/ui_settings.dart';
 import 'data/vinyl_store.dart';
 import 'screens/home_screen.dart';
 import 'theme.dart';
@@ -21,6 +22,7 @@ Future<void> main() async {
   await store.load();
   await LibrarySettings.load();
   await ChestNames.load();
+  await UiSettings.load();
   await Discogs.load();
   await BookletLite.load();
   await KoofrAccounts.load();
