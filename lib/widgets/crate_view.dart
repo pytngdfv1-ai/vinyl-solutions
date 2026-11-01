@@ -167,6 +167,7 @@ class _CrateViewState extends State<CrateView>
 
   Widget _card(Vinyl v, double d, double c, double frontTop, double cx, bool isFront) {
     Widget cover = v.isDivider ? SeparatorCard(label: v.title) : CoverArt(vinyl: v);
+    final div = v.isDivider;
     if (isFront && !v.isDivider) cover = Hero(tag: 'cover-${v.id}', child: cover);
 
     if (d >= 0) {
@@ -179,20 +180,22 @@ class _CrateViewState extends State<CrateView>
         top: top,
         width: size,
         height: size,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 5, offset: Offset(0, -2))],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              cover,
-              IgnorePointer(
-                child: ColoredBox(color: Colors.black.withOpacity(shade)),
+        child: div
+            ? SeparatorCard(label: v.title, shade: shade / 0.65)
+            : DecoratedBox(
+                decoration: const BoxDecoration(
+                  boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 5, offset: Offset(0, -2))],
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    cover,
+                    IgnorePointer(
+                      child: ColoredBox(color: Colors.black.withOpacity(shade)),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
       );
     }
 

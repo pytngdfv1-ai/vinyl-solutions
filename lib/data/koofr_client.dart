@@ -130,6 +130,25 @@ class KoofrClient {
     ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
 
+  /// Subcarpetas de la ruta [segs] (relativa a la carpeta raíz).
+  Future<List<String>> subfolders(List<String> segs) async {
+    final entries = await _list(_under(segs, dir: true));
+    return [
+      for (final e in entries)
+        if (e.isDir) e.name,
+    ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }
+
+  /// Renombra una carpeta (sin sobrescribir). Devuelve la ruta nueva.
+  Future<List<String>> renameDir(List<String> segs, String newName) async {
+    final n = _clean(newName);
+    if (n.isEmpty) throw const KoofrException('Nombre vacío');
+    final to = [...segs.sublist(0, segs.length - 1), n];
+    if (_same(segs, to)) return segs;
+    await _move(_under(segs, dir: true), _under(to, dir: true));
+    return to;
+  }
+
   static String _clean(String s) => s.replaceAll(RegExp(r'[\\/:*?"<>|]'), '-').trim();
 
   static String cleanName(String s) => _clean(s);

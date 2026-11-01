@@ -65,6 +65,8 @@ class Vinyl {
   String get yearLabel => year > 0 ? '$year' : '';
 
   Vinyl copyWith({
+    String? title,
+    String? artist,
     bool? owned,
     String? genre,
     String? source,
@@ -83,8 +85,8 @@ class Vinyl {
   }) =>
       Vinyl(
         id: id,
-        title: title,
-        artist: artist,
+        title: title ?? this.title,
+        artist: artist ?? this.artist,
         year: year,
         hue: hue,
         tracks: tracks ?? this.tracks,

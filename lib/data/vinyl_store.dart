@@ -16,6 +16,9 @@ class VinylStore extends ChangeNotifier {
   SharedPreferences? _prefs;
   List<Vinyl> _items = [];
 
+  /// Nombres corregidos a mano: id -> {title, artist, tracks}. Se reaplican tras cada escaneo.
+  Map<String, Map<String, dynamic>> _edits = {};
+
   List<Vinyl> get items => List.unmodifiable(_items);
 
   Future<void> load() async {
@@ -25,6 +28,15 @@ class VinylStore extends ChangeNotifier {
       if (c != null) {
         _carry = {
           for (final e in (jsonDecode(c) as Map<String, dynamic>).entries)
+            e.key: Map<String, dynamic>.from(e.value as Map),
+        };
+      }
+    } catch (_) {}
+    try {
+      final n = _prefs!.getString('name_edits_v1');
+      if (n != null) {
+        _edits = {
+          for (final e in (jsonDecode(n) as Map<String, dynamic>).entries)
             e.key: Map<String, dynamic>.from(e.value as Map),
         };
       }
@@ -183,7 +195,7 @@ class VinylStore extends ChangeNotifier {
     final others = _items.where((v) => !_fromAccount(v, accountId)).toList();
     final used = <String>[];
     final fresh = [
-      for (final v in scanned) _applyCarry(v, oldById[v.id], owned, genre, accountId, used),
+      for (final v in scanned) _applyEdit(_applyCarry(v, oldById[v.id], owned, genre, accountId, used)),
     ];
     if (used.isNotEmpty) {
       for (final k in used) {
@@ -210,8 +222,8 @@ class VinylStore extends ChangeNotifier {
     final oldById = {for (final v in _items) v.id: v};
     _items = [
       for (final a in albums)
-        _keepManual(
-            a.copyWith(owned: owned[a.id] ?? true, source: a.source ?? 'local'), oldById[a.id]),
+        _applyEdit(_keepManual(
+            a.copyWith(owned: owned[a.id] ?? true, source: a.source ?? 'local'), oldById[a.id])),
       ..._items.where((v) => !ids.contains(v.id)),
     ];
     notifyListeners();
@@ -233,6 +245,42 @@ class VinylStore extends ChangeNotifier {
     _items = [for (final v in _items) s.contains(v.id) ? v.copyWith(owned: false) : v];
     notifyListeners();
     await _save();
+  }
+
+  Vinyl _applyEdit(Vinyl v) {
+    final e = _edits[v.id];
+    if (e == null) return v;
+    final t = e['tracks'];
+    return v.copyWith(
+      title: e['title'] as String?,
+      artist: e['artist'] as String?,
+      tracks: t is List && t.length == v.tracks.length ? t.cast<String>() : null,
+    );
+  }
+
+  /// El usuario corrige el nombre, el artista o los temas de un disco (o tema suelto).
+  Future<void> editNames(String id, {String? title, String? artist, List<String>? tracks}) async {
+    final e = <String, dynamic>{
+      if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
+      if (artist != null && artist.trim().isNotEmpty) 'artist': artist.trim(),
+      if (tracks != null) 'tracks': [for (final t in tracks) t.trim()],
+    };
+    _edits = {..._edits, id: e};
+    await _prefs?.setString('name_edits_v1', jsonEncode(_edits));
+    _items = [for (final v in _items) v.id == id ? _applyEdit(v) : v];
+    notifyListeners();
+    await _save();
+  }
+
+  /// Pasa las correcciones de un id a otro (cuando se renombra la carpeta en la nube).
+  Future<void> moveEdit(String from, String to, {bool dropTitle = false}) async {
+    final e = _edits[from];
+    if (e == null) return;
+    final n = Map<String, dynamic>.from(e);
+    if (dropTitle) n.remove('title');
+    _edits = {..._edits}..remove(from);
+    _edits[to] = n;
+    await _prefs?.setString('name_edits_v1', jsonEncode(_edits));
   }
 
   /// Fija la portada de un disco (la que el usuario eligió en Cover Studio).
@@ -344,6 +392,7 @@ class VinylStore extends ChangeNotifier {
             if (v.langManual && v.lang != null) v.id: v.lang,
         },
         'artistLang': _artistLang,
+        'nameEdits': _edits,
         'coverManual': {
           for (final v in _items)
             if (v.coverManual) v.id: v.cassette,
@@ -354,6 +403,9 @@ class VinylStore extends ChangeNotifier {
     final langs = Map<String, String>.from((d['langs'] as Map?) ?? const {});
     final cm = Map<String, bool>.from((d['coverManual'] as Map?) ?? const {});
     _artistLang = {..._artistLang, ...Map<String, String>.from((d['artistLang'] as Map?) ?? const {})};
+    final ne = (d['nameEdits'] as Map?) ?? const {};
+    _edits = {..._edits, for (final e in ne.entries) e.key as String: Map<String, dynamic>.from(e.value as Map)};
+    await _prefs?.setString('name_edits_v1', jsonEncode(_edits));
     _items = [
       for (final v in _items)
         v.copyWith(
@@ -363,6 +415,7 @@ class VinylStore extends ChangeNotifier {
           coverManual: cm.containsKey(v.id) ? true : null,
         ),
     ];
+    _items = [for (final v in _items) _applyEdit(v)];
     notifyListeners();
     await _prefs?.setString('artist_lang_v1', jsonEncode(_artistLang));
     await _save();
