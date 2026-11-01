@@ -46,7 +46,7 @@ jobs:
 
       - name: Build APK
         shell: bash
-        run: flutter build apk --release --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }} 2>&1 | tee build.log
+        run: flutter build apk --release --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }} --dart-define=APP_VERSION=1.0.${{ github.run_number }} 2>&1 | tee build.log
 
       - name: Verify signature
         shell: bash
