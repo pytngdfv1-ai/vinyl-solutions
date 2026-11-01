@@ -6,6 +6,8 @@ import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
 import 'pending_screen.dart';
+import 'new_folder_dialog.dart';
+import '../data/koofr_settings.dart';
 import 'about_screen.dart';
 import 'duplicates_screen.dart';
 import 'playlist_screens.dart';
@@ -115,6 +117,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       _push(const PlaylistsScreen());
                     case 'dups':
                       _push(DuplicatesScreen(store: widget.store));
+                    case 'newfolder':
+                      if (KoofrAccounts.list.isEmpty) {
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(const SnackBar(content: Text('Primero conecta la nube (Koofr)')));
+                      } else {
+                        showDialog<void>(context: context, builder: (_) => const NewCloudFolderDialog());
+                      }
                     case 'pending':
                       _push(PendingScreen(store: widget.store));
                     case 'studio':
@@ -133,6 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   PopupMenuItem(value: 'disc', child: Text('Agregar disco a mano')),
                   PopupMenuItem(value: 'playlists', child: Text('Playlists')),
                   PopupMenuItem(value: 'dups', child: Text('Duplicados')),
+                  PopupMenuItem(value: 'newfolder', child: Text('Carpeta nueva en la nube')),
                   PopupMenuItem(value: 'pending', child: Text('Pendientes (sin portada o PDF)')),
                   PopupMenuItem(value: 'studio', child: Text('Cover Studio (portadas y PDF)')),
                   PopupMenuDivider(),

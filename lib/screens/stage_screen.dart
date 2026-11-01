@@ -8,6 +8,7 @@ import '../data/library_order.dart';
 import '../data/library_sync.dart';
 import '../data/vinyl_store.dart';
 import 'cover_studio_screen.dart';
+import 'edit_names_dialog.dart';
 import 'playlist_screens.dart';
 import '../data/playlists.dart';
 import 'upload_dialog.dart';
@@ -821,6 +822,26 @@ class DetailSheet extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Editar nombres'),
+                    onPressed: () async {
+                      final nav = Navigator.of(context);
+                      final r = await showDialog<String>(
+                        context: context,
+                        builder: (_) => EditNamesDialog(store: store, vinyl: v, account: _cloudAccount(v)),
+                      );
+                      if (r == 'moved') {
+                        nav
+                          ..pop()
+                          ..pop();
+                      }
+                    },
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
