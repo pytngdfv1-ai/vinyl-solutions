@@ -70,7 +70,7 @@ class StudioSave {
       final local = await CoverCache.save('studio_${v.id}_${DateTime.now().millisecondsSinceEpoch}', bytes, mimeOf(ext));
       await store.setCover(v.id, local);
     }
-    if (type == 'booklet' && saved != null) await store.addBooklet(v.id, saved);
+    if ((type == 'booklet' || type == 'back') && saved != null) await store.addBooklet(v.id, saved);
   }
 
   /// Guarda un PDF en la carpeta del disco y lo suma al libreto.

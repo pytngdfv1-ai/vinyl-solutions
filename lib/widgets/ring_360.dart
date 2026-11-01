@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Anillo 360°: las tarjetas giran alrededor de ti. Arrastra de lado para girar,
+/// Anillo 360°: tú estás en el centro y las tarjetas giran a tu alrededor. Arrastra de lado para girar,
 /// toca la del frente para abrirla o cualquier otra para traerla al frente.
 class Ring360 extends StatefulWidget {
   const Ring360({
@@ -47,8 +47,8 @@ class _Ring360State extends State<Ring360> with SingleTickerProviderStateMixin {
   double _to = 0;
   int _last = -1;
 
-  bool get _wrap => widget.count >= 9;
-  double get _step => _wrap ? 2 * math.pi / widget.count : 0.7;
+  bool get _wrap => widget.count >= 6;
+  double get _step => _wrap ? 2 * math.pi / widget.count : 0.9;
   double get _max => math.max(0, widget.count - 1).toDouble();
 
   @override
@@ -107,12 +107,13 @@ class _Ring360State extends State<Ring360> with SingleTickerProviderStateMixin {
       builder: (context, cons) {
         final w = cons.maxWidth;
         final h = cons.maxHeight;
-        final ch = math.min(h * 0.58, w * 0.66 / widget.aspect);
+        final ch = math.min(h * 0.58, w * 0.52 / widget.aspect);
         final cw = ch * widget.aspect;
-        final r = math.max(w * 0.2, w / 2 - cw * 0.28);
         final cx = w / 2;
         final cy = h * 0.44;
-        final px = math.max(24.0, r * _step);
+        // Tú estás en el centro del anillo: cada radián de giro mueve las tarjetas [k] píxeles.
+        final k = (w / 2) / 1.15;
+        final px = math.max(20.0, k * _step);
         final front = _index(_pos);
 
         final placed = <_Placed>[];
@@ -122,20 +123,22 @@ class _Ring360State extends State<Ring360> with SingleTickerProviderStateMixin {
             d = d % n;
             if (d > n / 2) d -= n;
           }
-          placed.add(_Placed(i, d, d * _step));
+          final th = d * _step;
+          if (th.abs() > 1.75) continue; // detrás de ti: no se ve
+          placed.add(_Placed(i, d, th));
         }
-        placed.sort((a, b) => math.cos(a.th).compareTo(math.cos(b.th)));
+        // Primero las más lejanas (a los lados); la del frente queda encima.
+        placed.sort((a, b) => b.th.abs().compareTo(a.th.abs()));
 
         final cards = <Widget>[];
         for (final e in placed) {
-          final depth = (1 + math.cos(e.th)) / 2;
-          final s = 0.42 + 0.58 * math.pow(depth, 1.4).toDouble();
-          final x = r * math.sin(e.th);
-          final dy = -(1 - depth) * ch * 0.26;
-          final shade = ((1 - depth) * 0.75).clamp(0.0, 0.75).toDouble();
+          final t = (e.th.abs() / 1.2).clamp(0.0, 1.0).toDouble();
+          final s = 1 - 0.22 * t * t;
+          final x = k * e.th;
+          final shade = (t * t * 0.7).clamp(0.0, 0.7).toDouble();
           cards.add(Positioned(
             left: cx + x - cw / 2,
-            top: cy + dy - ch / 2,
+            top: cy - ch / 2,
             width: cw,
             height: ch,
             child: GestureDetector(
@@ -145,9 +148,10 @@ class _Ring360State extends State<Ring360> with SingleTickerProviderStateMixin {
                   : null,
               child: Transform(
                 alignment: Alignment.center,
+                // La tarjeta mira hacia ti: las de la derecha se giran hacia la izquierda y viceversa.
                 transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.0008)
-                  ..rotateY(-e.th * 0.6)
+                  ..setEntry(3, 2, 0.0007)
+                  ..rotateY(e.th * 0.85)
                   ..scale(s, s, 1.0),
                 child: Stack(
                   fit: StackFit.expand,
@@ -178,6 +182,7 @@ class _Ring360State extends State<Ring360> with SingleTickerProviderStateMixin {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
+              Positioned.fill(child: CustomPaint(painter: _FloorPainter(cx, cy + ch * 0.56, w))),
               ...cards,
               if (cap != null)
                 Positioned(
@@ -207,4 +212,32 @@ class _Ring360State extends State<Ring360> with SingleTickerProviderStateMixin {
       },
     );
   }
+}
+
+/// Suelo del anillo: un resplandor bajo las tarjetas, como si estuvieras en el centro de la sala.
+class _FloorPainter extends CustomPainter {
+  _FloorPainter(this.cx, this.y, this.w);
+  final double cx;
+  final double y;
+  final double w;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromCenter(center: Offset(cx, y), width: w * 0.95, height: w * 0.16);
+    canvas.drawOval(
+      rect,
+      Paint()
+        ..shader = RadialGradient(colors: [Colors.white.withOpacity(0.10), Colors.transparent]).createShader(rect),
+    );
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = Colors.white.withOpacity(0.07);
+    for (var i = 1; i <= 3; i++) {
+      canvas.drawOval(Rect.fromCenter(center: Offset(cx, y), width: w * 0.3 * i, height: w * 0.05 * i), ring);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FloorPainter old) => old.cx != cx || old.y != y || old.w != w;
 }

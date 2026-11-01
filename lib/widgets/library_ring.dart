@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/vinyl.dart';
-import 'cassette_card.dart';
+import 'cassette_3d.dart';
 import 'cover_art.dart';
 import 'ring_360.dart';
 
@@ -112,7 +112,7 @@ class _LibraryRingState extends State<LibraryRing> {
                     itemBuilder: (_, i) {
                       final v = slice[i];
                       return (v.single || v.cassette)
-                          ? CassetteCard(vinyl: v)
+                          ? Cassette3D(vinyl: v)
                           : ClipRRect(borderRadius: BorderRadius.circular(8), child: CoverArt(vinyl: v, radius: 0));
                     },
                     onFront: (i) => widget.onPick(slice[i]),
