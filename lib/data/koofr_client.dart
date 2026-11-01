@@ -51,8 +51,8 @@ class KoofrClient {
 
   static const _audioExt = ['.flac', '.mp3', '.m4a', '.ogg', '.opus', '.wav', '.aac'];
   static const _imageExt = ['.jpg', '.jpeg', '.png', '.webp'];
-  static const _maxDepth = 5;
-  static const _maxDirs = 600;
+  static const _maxDepth = 6;
+  static const _maxDirs = 1500;
 
   int _dirs = 0;
   int _filesSeen = 0;
