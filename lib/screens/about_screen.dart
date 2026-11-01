@@ -118,7 +118,7 @@ class _AboutScreenState extends State<AboutScreen> {
             style: TextStyle(color: _muted)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          pill('Versión ', '1.0'),
+          pill('Versión ', const String.fromEnvironment('APP_VERSION', defaultValue: '1.0 (desarrollo)')),
           pill('', 'Manual de uso'),
           pill('', 'Sin cuenta, sin anuncios'),
         ]),
