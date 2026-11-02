@@ -1,34 +1,95 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 
 import '../models/vinyl.dart';
 import 'cover_art.dart';
+import 'turntable.dart';
+import 'vinyl_disc.dart';
 
 /// Animación al abrir un disco o un cassette (~1,5 s, se salta tocando la pantalla).
-/// Disco: sale de la funda y cae sobre la tornamesa, con su etiqueta central (artista, álbum, año).
-/// Cassette: se abre en 3D y cae al casetero, con la portada cubriendo la franja de color.
+/// Disco: sale del sobre con perspectiva 3D, se inclina, y aterriza sobre el plato con un
+/// resorte (rebote). Es el MISMO [VinylDisc] que luego queda en el plato: sin salto visual.
 class OpenAnimation extends StatefulWidget {
-  const OpenAnimation({super.key, required this.vinyl, required this.onDone});
+  const OpenAnimation({
+    super.key,
+    required this.vinyl,
+    required this.onDone,
+    required this.targetKey,
+    required this.sourceKey,
+  });
 
   final Vinyl vinyl;
   final VoidCallback onDone;
+
+  /// Dónde queda el disco / cassette (tornamesa o casetero) y de dónde sale (la portada).
+  final GlobalKey targetKey;
+  final GlobalKey sourceKey;
 
   @override
   State<OpenAnimation> createState() => _OpenAnimationState();
 }
 
-class _OpenAnimationState extends State<OpenAnimation> with SingleTickerProviderStateMixin {
+class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateMixin {
+  // Salida del sobre (0..1) y aterrizaje con resorte (sin límites: rebota).
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
-  )..forward().whenComplete(() {
-      if (mounted) widget.onDone();
+    duration: const Duration(milliseconds: 950),
+  );
+  late final AnimationController _land = AnimationController.unbounded(vsync: this, value: 0);
+  Rect? _target, _source;
+  bool _finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _measure();
+      if (_target == null) {
+        _finish();
+        return;
+      }
+      _c.forward().whenComplete(_landing);
     });
+  }
+
+  Rect? _rectOf(GlobalKey k) {
+    final ctx = k.currentContext;
+    final me = context.findRenderObject();
+    if (ctx == null || me is! RenderBox) return null;
+    final rb = ctx.findRenderObject();
+    if (rb is! RenderBox || !rb.attached) return null;
+    final tl = me.globalToLocal(rb.localToGlobal(Offset.zero));
+    return tl & rb.size;
+  }
+
+  void _measure() => setState(() {
+        _target = _rectOf(widget.targetKey);
+        _source = _rectOf(widget.sourceKey);
+      });
+
+  void _landing() {
+    if (!mounted || _finished) return;
+    const spring = SpringDescription(mass: 1, stiffness: 230, damping: 15);
+    _land
+        .animateWith(SpringSimulation(spring, 0, 1, 2.2, tolerance: const Tolerance(distance: 0.004, velocity: 0.08)))
+        .whenComplete(_finish);
+  }
+
+  void _finish() {
+    if (_finished) return;
+    _finished = true;
+    HapticFeedback.mediumImpact();
+    widget.onDone();
+  }
 
   @override
   void dispose() {
     _c.dispose();
+    _land.dispose();
     super.dispose();
   }
 
@@ -38,72 +99,98 @@ class _OpenAnimationState extends State<OpenAnimation> with SingleTickerProvider
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: widget.onDone,
+      onTap: _finish,
       child: AnimatedBuilder(
-        animation: _c,
+        animation: Listenable.merge([_c, _land]),
         builder: (context, _) {
-          final t = _c.value;
-          final fade = t < 0.85 ? 1.0 : (1 - (t - 0.85) / 0.15).clamp(0.0, 1.0).toDouble();
-          return LayoutBuilder(builder: (context, box) {
-            final w = box.maxWidth, h = box.maxHeight;
-            return Opacity(
-              opacity: fade,
-              child: Stack(
-                children: [
-                  Positioned.fill(child: ColoredBox(color: Colors.black.withOpacity(0.55 * fade))),
-                  _tape ? _cassette(w, h, t) : _disc(w, h, t),
-                ],
-              ),
-            );
-          });
+          final t = _target;
+          if (t == null) return const SizedBox.expand();
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _tape ? _cassette(t, _source) : _disc(t, _source),
+            ],
+          );
         },
       ),
     );
   }
 
-  // ---- Disco: sale de la funda y cae a la tornamesa ----
-  Widget _disc(double w, double h, double t) {
+  // ---- Disco: sale del sobre con perspectiva y aterriza con rebote ----
+  Widget _disc(Rect target, Rect? source) {
     final v = widget.vinyl;
-    final d = math.min(w * 0.62, h * 0.34);
-    final sleeve = d * 1.06;
-    const out = 0.45;
-    final a = Curves.easeOut.transform((t / out).clamp(0.0, 1.0).toDouble());
-    final b = Curves.easeIn.transform(((t - out) / (1 - out)).clamp(0.0, 1.0).toDouble());
-    final startY = h * 0.66, outY = h * 0.66 - sleeve * 0.75, endY = h * 0.3;
-    final y = t < out ? startY + (outY - startY) * a : outY + (endY - outY) * b;
-    final scale = t < out ? 1.0 : 1.0 - 0.12 * b;
-    final sleeveFade = (1 - (t - out) / 0.3).clamp(0.0, 1.0).toDouble();
+    final tracks = v.tracks.length;
+    final sc = Turntable.scaleFor(v.single, tracks);
+    final geo = Turntable.discGeometry(target.size, sc);
+    final tCenter = target.topLeft + geo.$1;
+    final tD = geo.$2 * 2;
+    final src = source ?? Rect.fromCenter(center: target.center + Offset(0, target.height), width: tD, height: tD);
+    final sD = math.min(src.width, src.height) * 0.96;
+
+    final e = Curves.easeInOutCubic.transform(_c.value);
+    final lv = _land.value; // 0 → 1 (con rebote)
+    final hover = tCenter + Offset(0, -tD * 0.18);
+    final landing = _c.isCompleted || _land.value != 0;
+
+    final Offset pos;
+    final double dia, tilt, elev;
+    if (!landing) {
+      pos = Offset.lerp(src.center, hover, e)!;
+      dia = sD + (tD * 1.07 - sD) * e;
+      tilt = 0.95 * (1 - e) + 0.28 * e; // se inclina más al salir, se endereza al llegar
+      elev = e;
+    } else {
+      pos = Offset.lerp(hover, tCenter, lv)!;
+      dia = tD * (1.07 - 0.07 * lv);
+      tilt = 0.28 * (1 - lv).clamp(0.0, 1.0);
+      elev = (1 - lv).clamp(0.0, 1.0);
+    }
+    final spin = (1 - (landing ? 1.0 : e * 0.8)) * 3.0 + (landing ? (1 - lv) * 0.6 : 0.0);
+    final m = Matrix4.identity()
+      ..setEntry(3, 2, 0.0014)
+      ..rotateX(tilt)
+      ..rotateY(-tilt * 0.35);
+    final sleeveFade = landing ? (1 - lv * 1.4).clamp(0.0, 1.0).toDouble() : 1.0;
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         Positioned(
-          left: w / 2 - d / 2,
-          top: y - d / 2,
-          width: d,
-          height: d,
-          child: Transform.scale(
-            scale: scale,
-            child: Transform.rotate(angle: t * 2.2, child: _DiscFace(v)),
-          ),
-        ),
-        Positioned(
-          left: w / 2 - sleeve / 2,
-          top: startY - sleeve / 2,
-          width: sleeve,
-          height: sleeve,
-          child: Opacity(
-            opacity: sleeveFade,
-            child: DecoratedBox(
-              decoration: const BoxDecoration(boxShadow: [BoxShadow(color: Colors.black87, blurRadius: 10)]),
-              child: CoverArt(vinyl: v, radius: 2),
+          left: pos.dx - dia / 2,
+          top: pos.dy - dia / 2,
+          width: dia,
+          height: dia,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: m,
+            child: VinylDisc(
+              vinyl: v,
+              diameter: dia,
+              spin: spin,
+              labelRatio: Turntable.labelRatioFor(sc),
+              tracks: tracks,
+              elevation: elev,
             ),
           ),
         ),
+        // Sobre: copia de la portada encima del disco mientras sale.
+        if (source != null && sleeveFade > 0)
+          Positioned.fromRect(
+            rect: src,
+            child: Opacity(
+              opacity: sleeveFade,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)]),
+                child: CoverArt(vinyl: v, radius: 2),
+              ),
+            ),
+          ),
       ],
     );
   }
 
   // ---- Cassette: se abre en 3D y cae al casetero ----
-  Widget _cassette(double w, double h, double t) {
+  Widget _cassette(Rect target, Rect? source) {
+    final w = target.right + target.left, h = target.bottom * 2.4, t = _c.value;
     final cw = w * 0.7;
     final ch = cw / 1.57;
     final k = Curves.easeInOut.transform(t.clamp(0.0, 1.0).toDouble());

@@ -49,7 +49,9 @@ class _StageScreenState extends State<StageScreen> {
   String? _error;
   Color? _bg; // color de la portada (fondo del reproductor)
   int _page = 0; // página del carrusel (0 = carátula)
-  bool _anim = UiSettings.animations.value; // animación de apertura en curso
+  bool _anim = UiSettings.animations.value && UiSettings.fx; // animación de apertura en curso
+  final _visKey = GlobalKey();
+  final _coverKey = GlobalKey();
 
   Vinyl get v => widget.vinyl;
 
@@ -133,6 +135,7 @@ class _StageScreenState extends State<StageScreen> {
       trackIndex: trackIndex,
       trackCount: v.tracks.length,
       single: v.single,
+      showDisc: !_anim,
     );
   }
 
@@ -224,7 +227,7 @@ class _StageScreenState extends State<StageScreen> {
         _stageBody(),
         if (_anim)
           Positioned.fill(
-            child: OpenAnimation(vinyl: v, onDone: () {
+            child: OpenAnimation(vinyl: v, targetKey: _visKey, sourceKey: _coverKey, onDone: () {
               if (mounted) setState(() => _anim = false);
             }),
           ),
@@ -295,7 +298,7 @@ class _StageScreenState extends State<StageScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
                 onTap: _toggle,
-                child: _turntable(),
+                child: KeyedSubtree(key: _visKey, child: _turntable()),
               ),
             ),
             Expanded(
@@ -306,6 +309,7 @@ class _StageScreenState extends State<StageScreen> {
                     child: GestureDetector(
                       onTap: () => setState(() => _flipped = !_flipped),
                       child: SizedBox(
+                        key: _coverKey,
                         width: s,
                         height: s,
                         child: Hero(

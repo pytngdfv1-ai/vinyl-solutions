@@ -3,9 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/vinyl.dart';
-import 'cover_art.dart';
+import 'vinyl_disc.dart';
 
-const double _deg = math.pi / 180;
 
 Offset _rot(Offset v, double t) => Offset(
       v.dx * math.cos(t) - v.dy * math.sin(t),
@@ -61,6 +60,7 @@ class Turntable extends StatefulWidget {
     this.trackIndex = 0,
     this.trackCount = 1,
     this.single = false,
+    this.showDisc = true,
   });
 
   final Vinyl vinyl;
@@ -74,7 +74,20 @@ class Turntable extends StatefulWidget {
   final int trackCount;
   final bool single;
 
-  double get scale => single ? 0.64 : (trackCount <= 4 ? 0.8 : 1.0);
+  /// false mientras el disco viaja en la animación de apertura (el plato queda vacío).
+  final bool showDisc;
+
+  /// Centro y radio del disco sobre el plato, para la animación de apertura.
+  static (Offset, double) discGeometry(Size s, double scale) {
+    final g = _Geo(s, scale: scale);
+    return (g.center, g.dr);
+  }
+
+  static double labelRatioFor(double scale) => scale >= 1 ? 0.33 : (scale > 0.7 ? 0.40 : 0.48);
+
+  static double scaleFor(bool single, int trackCount) => single ? 0.64 : (trackCount <= 4 ? 0.8 : 1.0);
+
+  double get scale => scaleFor(single, trackCount);
 
   @override
   State<Turntable> createState() => _TurntableState();
@@ -127,31 +140,28 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
       child: LayoutBuilder(
         builder: (context, c) {
           final g = _Geo(Size(c.maxWidth, c.maxHeight), scale: widget.scale);
-          final lr = g.dr * g.labelRatio;
           return Stack(
             children: [
               Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _spin,
-                  builder: (_, __) => CustomPaint(
-                    painter: _DiscPainter(
-                      spin: _spin.value,
-                      scale: widget.scale,
+                child: CustomPaint(painter: _DiscPainter(scale: widget.scale)),
+              ),
+              if (widget.showDisc)
+                Positioned(
+                  left: g.center.dx - g.dr,
+                  top: g.center.dy - g.dr,
+                  width: g.dr * 2,
+                  height: g.dr * 2,
+                  child: AnimatedBuilder(
+                    animation: _spin,
+                    builder: (_, __) => VinylDisc(
+                      vinyl: widget.vinyl,
+                      diameter: g.dr * 2,
+                      spin: _spin.value * 2 * math.pi,
+                      labelRatio: g.labelRatio,
                       tracks: widget.trackCount,
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: g.center.dx - lr,
-                top: g.center.dy - lr,
-                width: lr * 2,
-                height: lr * 2,
-                child: RotationTransition(
-                  turns: _spin,
-                  child: _Label(vinyl: widget.vinyl),
-                ),
-              ),
               Positioned.fill(
                 child: TweenAnimationBuilder<double>(
                   tween: Tween<double>(end: widget.progress),
@@ -178,30 +188,11 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
   }
 }
 
-/// Etiqueta redonda del disco con la portada del álbum.
-class _Label extends StatelessWidget {
-  const _Label({required this.vinyl});
-  final Vinyl vinyl;
-
-  @override
-  Widget build(BuildContext context) {
-    final fallback = ColoredBox(color: hueColor(vinyl.hue, 0.7, 0.5));
-    final url = vinyl.coverUrl;
-    return ClipOval(
-      child: url == null
-          ? fallback
-          : buildCoverImage(url, cacheWidth: 300, fallback: fallback),
-    );
-  }
-}
-
 /// Base, plato, disco con reflejos y control de velocidad.
 class _DiscPainter extends CustomPainter {
-  _DiscPainter({required this.spin, required this.scale, required this.tracks});
+  _DiscPainter({required this.scale});
 
-  final double spin;
   final double scale;
-  final int tracks;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -251,7 +242,6 @@ class _DiscPainter extends CustomPainter {
 
     // Plato.
     final r = g.r;
-    final dr = g.dr;
     canvas.drawCircle(
       g.center + Offset(0, r * 0.03),
       r * 1.1,
@@ -260,62 +250,10 @@ class _DiscPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
     );
     canvas.drawCircle(g.center, r * 1.1, Paint()..color = const Color(0xFF9E9E9E));
-
-    // Disco (gira).
-    canvas.save();
-    canvas.translate(g.center.dx, g.center.dy);
-    canvas.rotate(spin * 2 * math.pi);
-    canvas.drawCircle(Offset.zero, dr, Paint()..color = const Color(0xFF2A2A2C));
-
-    // Reflejos en sectores (arriba y abajo), como el disco de referencia.
-    final bandRect = Rect.fromCircle(center: Offset.zero, radius: dr * 0.70);
-    Paint band(Color c) => Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = dr * 0.50
-      ..color = c;
-    final mid = band(const Color(0xFF3B3B3E));
-    final light = band(const Color(0xFF515154));
-    for (final c in [-math.pi / 2, math.pi / 2]) {
-      canvas.drawArc(bandRect, c - 44 * _deg, 88 * _deg, false, mid);
-      canvas.drawArc(bandRect, c - 16 * _deg, 32 * _deg, false, light);
-    }
-
-    // Surcos finos y una separación (más oscura) entre cada tema.
-    final ro = dr * 0.93;
-    final ri = dr * (g.labelRatio + 0.10);
-    final fine = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(0.5, dr * 0.004)
-      ..color = Colors.white.withOpacity(0.05);
-    for (var rad = ro; rad > ri; rad -= dr * 0.03) {
-      canvas.drawCircle(Offset.zero, rad, fine);
-    }
-    final bands = _bands(tracks);
-    final gap = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.4, dr * 0.014)
-      ..color = const Color(0xFF050507);
-    final rim = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(0.6, dr * 0.005)
-      ..color = Colors.white.withOpacity(0.12);
-    for (var k = 1; k < bands; k++) {
-      final rad = ro - (ro - ri) * k / bands;
-      canvas.drawCircle(Offset.zero, rad, gap);
-      canvas.drawCircle(Offset.zero, rad + dr * 0.012, rim);
-    }
-
-    // Anillo negro alrededor de la etiqueta.
-    canvas.drawCircle(
-      Offset.zero,
-      dr * (g.labelRatio + 0.13),
-      Paint()..color = const Color(0xFF111113),
-    );
-    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _DiscPainter old) => old.spin != spin;
+  bool shouldRepaint(covariant _DiscPainter old) => old.scale != scale;
 }
 
 /// Eje central, base del brazo, brazo curvo con contrapeso y cápsula.
