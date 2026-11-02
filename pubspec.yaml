@@ -22,6 +22,7 @@ dependencies:
   pdf: ^3.11.1
   image: ^4.2.0
   cryptography: ^2.7.0
+  sensors_plus: 5.0.1
 
 dev_dependencies:
   flutter_test:
@@ -30,6 +31,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  shaders:
+    - shaders/vinyl_sheen.frag
   fonts:
     - family: Abril
       fonts:

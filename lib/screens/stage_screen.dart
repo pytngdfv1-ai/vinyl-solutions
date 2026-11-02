@@ -24,6 +24,7 @@ import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../data/ui_settings.dart';
 import '../widgets/open_animation.dart';
+import '../widgets/wear_painter.dart';
 import '../widgets/turntable.dart';
 import '../theme.dart';
 import 'booklet_screen.dart';
@@ -49,7 +50,11 @@ class _StageScreenState extends State<StageScreen> {
   String? _error;
   Color? _bg; // color de la portada (fondo del reproductor)
   int _page = 0; // página del carrusel (0 = carátula)
-  bool _anim = UiSettings.animations.value; // animación de apertura en curso
+  bool _anim = UiSettings.animations.value && UiSettings.fx; // animación de apertura en curso
+  final _visKey = GlobalKey();
+  final _coverKey = GlobalKey();
+  final _bayKey = GlobalKey(); // ranura del casetero
+  bool _ejecting = false;
 
   Vinyl get v => widget.vinyl;
 
@@ -123,7 +128,15 @@ class _StageScreenState extends State<StageScreen> {
         onPause: _pause,
         onPrev: _prev,
         onNext: _next,
-        onEject: () => Navigator.of(context).pop(),
+        bayKey: _bayKey,
+        hideCassette: _anim || _ejecting,
+        onEject: () {
+          if (UiSettings.animations.value && UiSettings.fx) {
+            setState(() => _ejecting = true);
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
       );
     }
     return Turntable(
@@ -133,6 +146,7 @@ class _StageScreenState extends State<StageScreen> {
       trackIndex: trackIndex,
       trackCount: v.tracks.length,
       single: v.single,
+      showDisc: !_anim,
     );
   }
 
@@ -222,11 +236,23 @@ class _StageScreenState extends State<StageScreen> {
       backgroundColor: AppColors.ink,
       body: Stack(children: [
         _stageBody(),
-        if (_anim)
+        if (_anim || _ejecting)
           Positioned.fill(
-            child: OpenAnimation(vinyl: v, onDone: () {
-              if (mounted) setState(() => _anim = false);
-            }),
+            child: OpenAnimation(
+              key: ValueKey(_ejecting),
+              vinyl: v,
+              reverse: _ejecting,
+              targetKey: (v.cassette || v.single) ? _bayKey : _visKey,
+              sourceKey: _coverKey,
+              onDone: () {
+                if (!mounted) return;
+                if (_ejecting) {
+                  Navigator.of(context).pop();
+                } else {
+                  setState(() => _anim = false);
+                }
+              },
+            ),
           ),
       ]),
     );
@@ -295,7 +321,7 @@ class _StageScreenState extends State<StageScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
                 onTap: _toggle,
-                child: _turntable(),
+                child: KeyedSubtree(key: _visKey, child: _turntable()),
               ),
             ),
             Expanded(
@@ -306,6 +332,7 @@ class _StageScreenState extends State<StageScreen> {
                     child: GestureDetector(
                       onTap: () => setState(() => _flipped = !_flipped),
                       child: SizedBox(
+                        key: _coverKey,
                         width: s,
                         height: s,
                         child: Hero(
@@ -504,7 +531,22 @@ class _Info extends StatelessWidget {
 /// pellizca para ampliar. Al tocar, se da vuelta la tapa (lista de temas).
 /// Carátula de frente: los cassettes y temas sueltos se ven como en la biblioteca
 /// (portada completa con relleno de color y las etiquetas de artista y tema).
-Widget _front(Vinyl v) => (v.cassette || v.single) ? CassetteCard(vinyl: v) : CoverArt(vinyl: v);
+Widget _front(Vinyl v) {
+  final base = (v.cassette || v.single) ? CassetteCard(vinyl: v) : CoverArt(vinyl: v);
+  if (!UiSettings.fx) return base;
+  // Desgaste procedural sobre la portada (rayas finas y polvo).
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      base,
+      IgnorePointer(
+        child: RepaintBoundary(
+          child: CustomPaint(painter: WearPainter(seed: Wear.seedOf(v), wear: Wear.of(v) * 0.6)),
+        ),
+      ),
+    ],
+  );
+}
 
 class _Carousel extends StatefulWidget {
   const _Carousel({

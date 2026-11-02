@@ -20,12 +20,27 @@ class UiSettings {
     } catch (_) {}
   }
 
+  /// Modo ahorro: apaga shader, sensores, desgaste, sombras dinámicas y animaciones 3D.
+  static final ValueNotifier<bool> powerSave = ValueNotifier<bool>(false);
+
+  /// Efectos visuales activos (lo contrario del modo ahorro).
+  static bool get fx => !powerSave.value;
+
+  static Future<void> setPowerSave(bool v) async {
+    powerSave.value = v;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool('ui_power_save', v);
+    } catch (_) {}
+  }
+
   static Future<void> load() async {
     try {
       final p = await SharedPreferences.getInstance();
       homeRing.value = p.getBool('ui_home_ring') ?? true;
       libRing.value = p.getBool('ui_lib_ring') ?? true;
       animations.value = p.getBool('ui_animations') ?? true;
+      powerSave.value = p.getBool('ui_power_save') ?? false;
     } catch (_) {}
   }
 
