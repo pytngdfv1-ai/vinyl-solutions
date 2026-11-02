@@ -9,11 +9,23 @@ class UiSettings {
   /// Interior de cada biblioteca en anillos 360° (si no, la caja de discos clásica).
   static final ValueNotifier<bool> libRing = ValueNotifier<bool>(true);
 
+  /// Animación al abrir un disco o cassette.
+  static final ValueNotifier<bool> animations = ValueNotifier<bool>(true);
+
+  static Future<void> setAnim(bool v) async {
+    animations.value = v;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool('ui_anim', v);
+    } catch (_) {}
+  }
+
   static Future<void> load() async {
     try {
       final p = await SharedPreferences.getInstance();
       homeRing.value = p.getBool('ui_home_ring') ?? true;
       libRing.value = p.getBool('ui_lib_ring') ?? true;
+      animations.value = p.getBool('ui_anim') ?? true;
     } catch (_) {}
   }
 

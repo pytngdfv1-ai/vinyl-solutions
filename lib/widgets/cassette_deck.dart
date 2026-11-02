@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../data/thumb_cache.dart';
 import '../models/vinyl.dart';
 
 /// Casetero en modo oscuro: tapa de vidrio y un cassette realista
@@ -41,6 +44,11 @@ class CassetteDeck extends StatefulWidget {
 class _ReelState extends ChangeNotifier {
   double aL = 0, aR = 0, overall = 0;
   Color tint = const Color(0xFFE8C14A);
+  ui.Image? cover;
+  void setCover(ui.Image? i) {
+    cover = i;
+    notifyListeners();
+  }
   void tick() => notifyListeners();
 }
 
@@ -76,16 +84,36 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
     }
   }
 
+  String? _coverFor;
+
+  Future<void> _loadCover() async {
+    final url = widget.vinyl.coverUrl;
+    if (url == _coverFor) return;
+    _coverFor = url;
+    _st.setCover(null);
+    if (url == null) return;
+    try {
+      final File? f = url.startsWith('file:') ? File(Uri.parse(url).toFilePath()) : await ThumbCache.get(url);
+      if (f == null || !mounted || url != _coverFor) return;
+      final codec = await ui.instantiateImageCodec(await f.readAsBytes(), targetWidth: 500);
+      final fr = await codec.getNextFrame();
+      if (!mounted || url != _coverFor) return;
+      _st.setCover(fr.image);
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     _sync();
+    _loadCover();
   }
 
   @override
   void didUpdateWidget(covariant CassetteDeck old) {
     super.didUpdateWidget(old);
     _sync();
+    _loadCover();
   }
 
   @override
@@ -477,6 +505,19 @@ class _CassettePainter extends CustomPainter {
     // --- Franja de color (naranja en la referencia; aquí, el tono del disco) ---
     final strip = Rect.fromLTRB(l, lb, r, h * 0.74);
     canvas.drawRect(strip, Paint()..color = tint);
+    final cv = st.cover;
+    if (cv != null) {
+      // La portada cubre el sector de color, recortada al centro (cover).
+      final iw = cv.width.toDouble(), ih = cv.height.toDouble();
+      final k = math.max(strip.width / iw, strip.height / ih);
+      final sw = strip.width / k, sh = strip.height / k;
+      canvas.drawImageRect(
+        cv,
+        Rect.fromLTWH((iw - sw) / 2, (ih - sh) / 2, sw, sh),
+        strip,
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+    }
     canvas.drawRect(Rect.fromLTRB(l, lb, r, lb + h * 0.012), Paint()..color = const Color(0x55000000));
     canvas.drawRect(
       Rect.fromLTRB(l, lb + h * 0.012, r, lb + h * 0.07),

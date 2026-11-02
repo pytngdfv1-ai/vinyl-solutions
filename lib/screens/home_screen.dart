@@ -16,6 +16,7 @@ import 'playlist_screens.dart';
 import 'search_screen.dart';
 import '../models/vinyl.dart';
 import '../theme.dart';
+import '../widgets/cassette_card.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/now_playing_chip.dart';
 import 'backup_screen.dart';
@@ -90,7 +91,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Ring360(
         count: cajones.length,
         aspect: 0.86,
-        itemBuilder: (_, i) => _HomeCard(label: cajones[i].name, covers: lists[i]),
+        itemBuilder: (_, i) => _HomeCard(
+          label: cajones[i].name,
+          covers: lists[i],
+          cassette: cajones[i].kind == CajonKind.covers || cajones[i].kind == CajonKind.singles,
+        ),
         onFront: (i) => _openCajon(cajones[i]),
         onLongPressFront: (i) => _rename(cajones[i]),
         caption: (i) => (cajones[i].name, '${lists[i].length} · mantén pulsado para renombrar'),
@@ -562,8 +567,9 @@ class _CabinetTile extends StatelessWidget {
 
 /// Tarjeta de una biblioteca en el anillo: cuatro portadas y el nombre.
 class _HomeCard extends StatelessWidget {
-  const _HomeCard({required this.label, required this.covers});
+  const _HomeCard({required this.label, required this.covers, this.cassette = false});
 
+  final bool cassette;
   final String label;
   final List<Vinyl> covers;
 
@@ -575,7 +581,9 @@ class _HomeCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(3),
             child: i < show.length
-                ? ClipRRect(borderRadius: BorderRadius.circular(4), child: CoverArt(vinyl: show[i], radius: 0))
+                ? (cassette
+                    ? CassetteCard(vinyl: show[i])
+                    : ClipRRect(borderRadius: BorderRadius.circular(4), child: CoverArt(vinyl: show[i], radius: 0)))
                 : const SizedBox.shrink(),
           ),
         );

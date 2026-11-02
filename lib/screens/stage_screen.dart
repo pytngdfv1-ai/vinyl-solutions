@@ -22,7 +22,9 @@ import '../data/koofr_client.dart';
 import '../widgets/cassette_card.dart';
 import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
+import '../widgets/open_anim.dart';
 import '../widgets/turntable.dart';
+import '../data/ui_settings.dart';
 import '../theme.dart';
 import 'booklet_screen.dart';
 import 'lyrics_sheet.dart';
@@ -278,7 +280,9 @@ class _StageScreenState extends State<StageScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
                 onTap: _toggle,
-                child: _turntable(),
+                child: UiSettings.animations.value
+                    ? OpenAnim(vinyl: widget.vinyl, child: _turntable())
+                    : _turntable(),
               ),
             ),
             Expanded(
