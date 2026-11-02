@@ -52,6 +52,8 @@ class _StageScreenState extends State<StageScreen> {
   bool _anim = UiSettings.animations.value && UiSettings.fx; // animación de apertura en curso
   final _visKey = GlobalKey();
   final _coverKey = GlobalKey();
+  final _bayKey = GlobalKey(); // ranura del casetero
+  bool _ejecting = false;
 
   Vinyl get v => widget.vinyl;
 
@@ -125,7 +127,15 @@ class _StageScreenState extends State<StageScreen> {
         onPause: _pause,
         onPrev: _prev,
         onNext: _next,
-        onEject: () => Navigator.of(context).pop(),
+        bayKey: _bayKey,
+        hideCassette: _anim || _ejecting,
+        onEject: () {
+          if (UiSettings.animations.value && UiSettings.fx) {
+            setState(() => _ejecting = true);
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
       );
     }
     return Turntable(
@@ -225,11 +235,23 @@ class _StageScreenState extends State<StageScreen> {
       backgroundColor: AppColors.ink,
       body: Stack(children: [
         _stageBody(),
-        if (_anim)
+        if (_anim || _ejecting)
           Positioned.fill(
-            child: OpenAnimation(vinyl: v, targetKey: _visKey, sourceKey: _coverKey, onDone: () {
-              if (mounted) setState(() => _anim = false);
-            }),
+            child: OpenAnimation(
+              key: ValueKey(_ejecting),
+              vinyl: v,
+              reverse: _ejecting,
+              targetKey: (v.cassette || v.single) ? _bayKey : _visKey,
+              sourceKey: _coverKey,
+              onDone: () {
+                if (!mounted) return;
+                if (_ejecting) {
+                  Navigator.of(context).pop();
+                } else {
+                  setState(() => _anim = false);
+                }
+              },
+            ),
           ),
       ]),
     );
