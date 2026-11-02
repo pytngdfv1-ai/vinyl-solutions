@@ -1,6 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
+
+import '../data/tilt.dart';
+import '../data/ui_settings.dart';
 
 import '../data/cover_color.dart';
 import '../models/vinyl.dart';
@@ -76,9 +80,8 @@ class VinylDisc extends StatelessWidget {
               ),
             ),
           ),
-          IgnorePointer(
-            child: CustomPaint(size: Size.square(d), painter: _SheenFallback(light + spin * 0.15)),
-          ),
+          if (UiSettings.fx)
+            IgnorePointer(child: _Sheen(diameter: d, angle: light + spin * 0.15)),
         ],
       ),
     );
@@ -154,6 +157,75 @@ class _DiscBodyPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DiscBodyPainter old) => old.tracks != tracks || old.labelRatio != labelRatio;
+}
+
+/// Brillo del vinilo: shader si está disponible (según la inclinación del teléfono); si no, degradado.
+class _Sheen extends StatefulWidget {
+  const _Sheen({required this.diameter, required this.angle});
+  final double diameter;
+  final double angle;
+
+  @override
+  State<_Sheen> createState() => _SheenState();
+}
+
+class _SheenState extends State<_Sheen> {
+  VoidCallback? _release;
+
+  @override
+  void initState() {
+    super.initState();
+    _release = Tilt.instance.acquire();
+    SheenShader.load().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _release?.call();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.diameter;
+    return ValueListenableBuilder<Offset>(
+      valueListenable: Tilt.instance.value,
+      builder: (_, t, __) {
+        final prog = SheenShader.program;
+        return CustomPaint(
+          size: Size.square(d),
+          painter: prog == null
+              ? _SheenFallback(widget.angle + t.dx * 1.2)
+              : _SheenShaderPainter(prog, widget.angle, t),
+        );
+      },
+    );
+  }
+}
+
+class _SheenShaderPainter extends CustomPainter {
+  _SheenShaderPainter(this.program, this.angle, this.tilt);
+  final ui.FragmentProgram program;
+  final double angle;
+  final Offset tilt;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sh = program.fragmentShader()
+      ..setFloat(0, size.width)
+      ..setFloat(1, size.height)
+      ..setFloat(2, angle)
+      ..setFloat(3, tilt.dx)
+      ..setFloat(4, tilt.dy)
+      ..setFloat(5, 1.0);
+    canvas.drawRect(Offset.zero & size, Paint()..shader = sh);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SheenShaderPainter old) =>
+      old.angle != angle || old.tilt != tilt || old.program != program;
 }
 
 /// Brillo angular sin shader (dos lóbulos opuestos). El shader lo reemplaza cuando está disponible.

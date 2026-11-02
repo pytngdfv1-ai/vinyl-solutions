@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../models/vinyl.dart';
+import '../data/tilt.dart';
 import 'cassette_body.dart';
 
 /// Casetero en modo oscuro: tapa de vidrio y un cassette realista
@@ -77,8 +78,18 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
   }
 
   @override
+  VoidCallback? _releaseTilt;
+
+  void _onTilt() {
+    _st.light = (0.5 + 0.5 * Tilt.instance.value.value.dx).clamp(0.0, 1.0).toDouble();
+    if (!_ticker.isActive) _st.tick();
+  }
+
+  @override
   void initState() {
     super.initState();
+    _releaseTilt = Tilt.instance.acquire();
+    Tilt.instance.value.addListener(_onTilt);
     _sync();
   }
 
@@ -90,6 +101,8 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    Tilt.instance.value.removeListener(_onTilt);
+    _releaseTilt?.call();
     _ticker.dispose();
     _st.dispose();
     super.dispose();
