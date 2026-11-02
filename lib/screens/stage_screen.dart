@@ -19,6 +19,7 @@ import '../data/classifier.dart';
 import '../data/cover_color.dart';
 import '../data/cover_lookup.dart';
 import '../data/koofr_client.dart';
+import '../widgets/cassette_card.dart';
 import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/turntable.dart';
@@ -313,7 +314,18 @@ class _StageScreenState extends State<StageScreen> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(_error!, style: const TextStyle(color: Colors.redAccent))),
+                    TextButton(
+                      onPressed: () async {
+                        setState(() => _error = null);
+                        await _ensureLoaded();
+                      },
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
               ),
             ValueListenableBuilder<Vinyl?>(
               valueListenable: _audio.nowPlaying,
@@ -473,6 +485,10 @@ class _Info extends StatelessWidget {
 
 /// Carátula + páginas del libreto: desliza hacia el costado para pasar de página,
 /// pellizca para ampliar. Al tocar, se da vuelta la tapa (lista de temas).
+/// Carátula de frente: los cassettes y temas sueltos se ven como en la biblioteca
+/// (portada completa con relleno de color y las etiquetas de artista y tema).
+Widget _front(Vinyl v) => (v.cassette || v.single) ? CassetteCard(vinyl: v) : CoverArt(vinyl: v);
+
 class _Carousel extends StatefulWidget {
   const _Carousel({
     required this.vinyl,
@@ -511,7 +527,7 @@ class _CarouselState extends State<_Carousel> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.pages.isEmpty) return CoverArt(vinyl: widget.vinyl);
+    if (widget.pages.isEmpty) return _front(widget.vinyl);
     const broken = Center(child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 48));
     return Stack(
       children: [
@@ -523,7 +539,7 @@ class _CarouselState extends State<_Carousel> {
             setState(() => _i = i);
           },
           itemBuilder: (_, i) {
-            if (i == 0) return CoverArt(vinyl: widget.vinyl);
+            if (i == 0) return _front(widget.vinyl);
             return ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: ColoredBox(

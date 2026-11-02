@@ -40,24 +40,39 @@ class PlayerService {
     await beforeStart?.call();
     _loading = true;
     try {
-      if (!v.trackUrls.first.startsWith('file:')) await _preflight(v.trackUrls.first);
-      // LockCachingAudioSource descarga desde Dart (con credenciales) y sirve
-      // el audio al reproductor; evita fallos de autenticación en redirecciones.
-      final source = ConcatenatingAudioSource(
-        children: [
-          for (final url in v.trackUrls)
-            url.startsWith('file:')
-                ? AudioSource.uri(Uri.parse(url))
-                : LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.headersFor(url)),
-        ],
-      );
-      this.chain = chain;
-      _changing = false;
-      _lastIndex = index;
-      await player.setAudioSource(source, initialIndex: index);
-      _loadedId = v.id;
-      nowPlaying.value = v;
-      unawaited(player.play());
+      // La nube a veces falla un instante ("Source error"): se reintenta hasta 3 veces;
+      // la última, directo con las credenciales (sin el caché local).
+      Object? last;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          if (!v.trackUrls.first.startsWith('file:')) await _preflight(v.trackUrls.first);
+          // LockCachingAudioSource descarga desde Dart (con credenciales) y sirve
+          // el audio al reproductor; evita fallos de autenticación en redirecciones.
+          final direct = attempt == 2;
+          final source = ConcatenatingAudioSource(
+            children: [
+              for (final url in v.trackUrls)
+                url.startsWith('file:')
+                    ? AudioSource.uri(Uri.parse(url))
+                    : direct
+                        ? AudioSource.uri(Uri.parse(url), headers: KoofrSettings.headersFor(url))
+                        : LockCachingAudioSource(Uri.parse(url), headers: KoofrSettings.headersFor(url)),
+            ],
+          );
+          this.chain = chain;
+          _changing = false;
+          _lastIndex = index;
+          await player.setAudioSource(source, initialIndex: index);
+          _loadedId = v.id;
+          nowPlaying.value = v;
+          unawaited(player.play());
+          return;
+        } catch (e) {
+          last = e;
+          await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
+        }
+      }
+      throw last ?? Exception('No se pudo cargar');
     } finally {
       _loading = false;
     }
