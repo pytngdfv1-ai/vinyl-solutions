@@ -84,6 +84,20 @@ Future<void> showLibrarySettings(BuildContext context) async {
             SwitchListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
+              title: const Text('Modo ahorro'),
+              subtitle: const Text(
+                'Apaga brillo (shader), sensores, desgaste, sombras dinámicas y animaciones 3D.',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: UiSettings.powerSave.value,
+              onChanged: (x) {
+                UiSettings.setPowerSave(x);
+                setLocal(() {});
+              },
+            ),
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
               title: const Text('Animaciones al abrir'),
               subtitle: const Text('El disco sale de la funda / el cassette cae al casetero. Toca para saltar.',
                   style: TextStyle(fontSize: 12)),

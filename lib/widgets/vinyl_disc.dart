@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import '../data/tilt.dart';
 import '../data/ui_settings.dart';
+import 'wear_painter.dart';
 
 import '../data/cover_color.dart';
 import '../models/vinyl.dart';
@@ -80,6 +81,19 @@ class VinylDisc extends StatelessWidget {
               ),
             ),
           ),
+          if (UiSettings.fx)
+            IgnorePointer(
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  size: Size.square(d),
+                  painter: WearPainter(
+                    seed: Wear.seedOf(vinyl),
+                    wear: wear > 0 ? wear : Wear.of(vinyl),
+                    round: true,
+                  ),
+                ),
+              ),
+            ),
           if (UiSettings.fx)
             IgnorePointer(child: _Sheen(diameter: d, angle: light + spin * 0.15)),
         ],

@@ -277,21 +277,44 @@ class _DiscPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Base clara.
+    // Base oscura: madera/metal oscuro con veta y sombra suave.
+    final base = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(w * 0.03));
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(w * 0.03)),
-      Paint()..color = const Color(0xFFF4F4F2),
+      base,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF3A2A1E), Color(0xFF241A13), Color(0xFF2E2118)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.save();
+    canvas.clipRRect(base);
+    final grain = Paint()
+      ..strokeWidth = 0.6
+      ..color = const Color(0x14FFFFFF);
+    for (var y = h * 0.04; y < h; y += h * 0.045) {
+      final wob = math.sin(y * 0.13) * h * 0.004;
+      canvas.drawLine(Offset(0, y + wob), Offset(w, y - wob), grain);
+    }
+    canvas.restore();
+    canvas.drawRRect(
+      base,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = const Color(0xFF55585B),
     );
 
-    // Botón cuadrado (arriba a la izquierda).
+    // Botón cuadrado (arriba a la izquierda): metal oscuro.
     final bs = w * 0.07;
     final btn = RRect.fromRectAndRadius(
       Rect.fromLTWH(w * 0.035, h * 0.06, bs, bs),
       Radius.circular(bs * 0.22),
     );
-    canvas.drawRRect(btn.shift(Offset(0, bs * 0.12)), Paint()..color = const Color(0xFFE0DEDE));
-    canvas.drawRRect(btn, Paint()..color = const Color(0xFF9C9C9C));
-    canvas.drawRRect(btn.deflate(bs * 0.13), Paint()..color = const Color(0xFFC8C8C8));
+    canvas.drawRRect(btn.shift(Offset(0, bs * 0.12)), Paint()..color = Colors.black54);
+    canvas.drawRRect(btn, Paint()..color = const Color(0xFF3B3D40));
+    canvas.drawRRect(btn.deflate(bs * 0.13), Paint()..color = const Color(0xFF55585C));
 
     // Control de velocidad (derecha).
     final sx = w * 0.935;
@@ -300,33 +323,49 @@ class _DiscPainter extends CustomPainter {
       Rect.fromLTRB(sx - sw / 2, h * 0.56, sx + sw / 2, h * 0.97),
       Radius.circular(sw * 0.15),
     );
-    canvas.drawRRect(slider.shift(Offset(0, sw * 0.12)), Paint()..color = const Color(0xFFE0DEDE));
-    canvas.drawRRect(slider, Paint()..color = const Color(0xFF9C9C9C));
+    canvas.drawRRect(slider.shift(Offset(0, sw * 0.12)), Paint()..color = Colors.black54);
+    canvas.drawRRect(slider, Paint()..color = const Color(0xFF3B3D40));
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTRB(sx - sw * 0.07, h * 0.60, sx + sw * 0.07, h * 0.93),
         Radius.circular(sw * 0.07),
       ),
-      Paint()..color = const Color(0xFF1B1B1B),
+      Paint()..color = const Color(0xFF0A0A0B),
     );
     final knob = RRect.fromRectAndRadius(
       Rect.fromCenter(center: Offset(sx, h * 0.745), width: sw * 0.92, height: sw * 0.78),
       Radius.circular(sw * 0.14),
     );
-    canvas.drawRRect(knob.shift(Offset(0, sw * 0.1)), Paint()..color = const Color(0xFF6E6E6E));
-    canvas.drawRRect(knob, Paint()..color = Colors.white);
-    canvas.drawRRect(knob.deflate(sw * 0.17), Paint()..color = const Color(0xFFD6D6D6));
+    canvas.drawRRect(knob.shift(Offset(0, sw * 0.1)), Paint()..color = Colors.black87);
+    canvas.drawRRect(knob, Paint()..color = const Color(0xFFB9BCC0));
+    canvas.drawRRect(knob.deflate(sw * 0.17), Paint()..color = const Color(0xFF8E9195));
 
-    // Plato.
+    // Plato: metal oscuro con aro y sombra suave.
     final r = g.r;
     canvas.drawCircle(
-      g.center + Offset(0, r * 0.03),
+      g.center + Offset(0, r * 0.04),
       r * 1.1,
       Paint()
-        ..color = Colors.black.withOpacity(0.14)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+        ..color = Colors.black.withOpacity(0.55)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
     );
-    canvas.drawCircle(g.center, r * 1.1, Paint()..color = const Color(0xFF9E9E9E));
+    canvas.drawCircle(
+      g.center,
+      r * 1.1,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xFF4A4D52), Color(0xFF2A2C30), Color(0xFF55585D)],
+          stops: [0.0, 0.85, 1.0],
+        ).createShader(Rect.fromCircle(center: g.center, radius: r * 1.1)),
+    );
+    canvas.drawCircle(
+      g.center,
+      r * 1.1,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0x44FFFFFF),
+    );
   }
 
   @override
@@ -389,7 +428,7 @@ class _ArmPainter extends CustomPainter {
     final shadowOff = Offset(g.w * 0.016, g.w * 0.022);
 
     // Base del brazo.
-    canvas.drawCircle(g.pivot, bR, Paint()..color = const Color(0xFF262626));
+    canvas.drawCircle(g.pivot, bR, Paint()..color = const Color(0xFF4A4D52));
 
     // Sombra del brazo.
     canvas.drawPath(

@@ -24,6 +24,7 @@ import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../data/ui_settings.dart';
 import '../widgets/open_animation.dart';
+import '../widgets/wear_painter.dart';
 import '../widgets/turntable.dart';
 import '../theme.dart';
 import 'booklet_screen.dart';
@@ -530,7 +531,22 @@ class _Info extends StatelessWidget {
 /// pellizca para ampliar. Al tocar, se da vuelta la tapa (lista de temas).
 /// Carátula de frente: los cassettes y temas sueltos se ven como en la biblioteca
 /// (portada completa con relleno de color y las etiquetas de artista y tema).
-Widget _front(Vinyl v) => (v.cassette || v.single) ? CassetteCard(vinyl: v) : CoverArt(vinyl: v);
+Widget _front(Vinyl v) {
+  final base = (v.cassette || v.single) ? CassetteCard(vinyl: v) : CoverArt(vinyl: v);
+  if (!UiSettings.fx) return base;
+  // Desgaste procedural sobre la portada (rayas finas y polvo).
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      base,
+      IgnorePointer(
+        child: RepaintBoundary(
+          child: CustomPaint(painter: WearPainter(seed: Wear.seedOf(v), wear: Wear.of(v) * 0.6)),
+        ),
+      ),
+    ],
+  );
+}
 
 class _Carousel extends StatefulWidget {
   const _Carousel({

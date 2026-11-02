@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/ui_settings.dart';
 import '../models/vinyl.dart';
+import 'wear_painter.dart';
 import 'cover_art.dart';
 
 /// Estado de los carretes: ángulos (giro antihorario) y avance de la cinta.
@@ -38,6 +39,7 @@ class CassetteBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = vinyl;
+    st.wear = Wear.of(v);
     return LayoutBuilder(builder: (context, c) {
       final cw = c.maxWidth, ch = c.maxHeight;
       return Stack(
