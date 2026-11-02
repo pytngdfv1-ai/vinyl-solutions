@@ -16,6 +16,7 @@ import 'playlist_screens.dart';
 import 'search_screen.dart';
 import '../models/vinyl.dart';
 import '../theme.dart';
+import '../widgets/cassette_card.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/now_playing_chip.dart';
 import 'backup_screen.dart';
@@ -575,7 +576,9 @@ class _HomeCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(3),
             child: i < show.length
-                ? ClipRRect(borderRadius: BorderRadius.circular(4), child: CoverArt(vinyl: show[i], radius: 0))
+                ? (show[i].cassette || show[i].single
+                    ? CassetteCard(vinyl: show[i])
+                    : ClipRRect(borderRadius: BorderRadius.circular(4), child: CoverArt(vinyl: show[i], radius: 0)))
                 : const SizedBox.shrink(),
           ),
         );

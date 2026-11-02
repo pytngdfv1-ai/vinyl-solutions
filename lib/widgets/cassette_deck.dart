@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../models/vinyl.dart';
+import 'cover_art.dart';
 
 /// Casetero en modo oscuro: tapa de vidrio y un cassette realista
 /// (carcasa transparente, etiqueta con renglones, carretes con dientes,
@@ -173,6 +174,22 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
                 child: Stack(
                   children: [
                     CustomPaint(size: Size(cw, ch), painter: _CassettePainter(_st)),
+                    // Etiqueta de color: la portada adaptada cubre la franja (sin tapar la ventana).
+                    if (v.coverUrl != null)
+                      Positioned.fill(
+                        child: ClipPath(
+                          clipper: _StripClipper(),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              CoverArt(vinyl: v, radius: 0),
+                              const DecoratedBox(
+                                decoration: BoxDecoration(color: Color(0x33000000)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     // Etiqueta escrita a mano.
                     Positioned(
                       left: cw * 0.09,
@@ -254,6 +271,24 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
       );
     });
   }
+}
+
+/// Franja de color del cassette menos la ventana en píldora.
+class _StripClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final w = size.width, h = size.height;
+    final strip = Path()..addRect(Rect.fromLTRB(w * 0.07, h * 0.31, w * 0.943, h * 0.74));
+    final pill = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTRB(w * 0.21, h * 0.337, w * 0.805, h * 0.585),
+        Radius.circular(h * 0.124),
+      ));
+    return Path.combine(PathOperation.difference, strip, pill);
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> old) => false;
 }
 
 class _Screw extends StatelessWidget {

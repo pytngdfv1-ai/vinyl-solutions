@@ -84,6 +84,18 @@ Future<void> showLibrarySettings(BuildContext context) async {
             SwitchListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
+              title: const Text('Animaciones al abrir'),
+              subtitle: const Text('El disco sale de la funda / el cassette cae al casetero. Toca para saltar.',
+                  style: TextStyle(fontSize: 12)),
+              value: UiSettings.animations.value,
+              onChanged: (x) {
+                UiSettings.setAnimations(x);
+                setLocal(() {});
+              },
+            ),
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
               title: const Text('Folletos PDF como imágenes livianas'),
               subtitle: const Text(
                 'Al importar, convierte cada PDF a WebP (~1600 px). El PDF original no se borra.',

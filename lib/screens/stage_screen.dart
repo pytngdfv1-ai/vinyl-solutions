@@ -22,6 +22,8 @@ import '../data/koofr_client.dart';
 import '../widgets/cassette_card.dart';
 import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
+import '../data/ui_settings.dart';
+import '../widgets/open_animation.dart';
 import '../widgets/turntable.dart';
 import '../theme.dart';
 import 'booklet_screen.dart';
@@ -47,6 +49,7 @@ class _StageScreenState extends State<StageScreen> {
   String? _error;
   Color? _bg; // color de la portada (fondo del reproductor)
   int _page = 0; // página del carrusel (0 = carátula)
+  bool _anim = UiSettings.animations.value; // animación de apertura en curso
 
   Vinyl get v => widget.vinyl;
 
@@ -217,7 +220,21 @@ class _StageScreenState extends State<StageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.ink,
-      body: AnimatedContainer(
+      body: Stack(children: [
+        _stageBody(),
+        if (_anim)
+          Positioned.fill(
+            child: OpenAnimation(vinyl: v, onDone: () {
+              if (mounted) setState(() => _anim = false);
+            }),
+          ),
+      ]),
+    );
+  }
+
+  Widget _stageBody() {
+    return Builder(builder: (context) {
+      return AnimatedContainer(
         duration: const Duration(milliseconds: 700),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -350,8 +367,8 @@ class _StageScreenState extends State<StageScreen> {
           ],
         ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
