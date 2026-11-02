@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
 import '../models/vinyl.dart';
 import '../data/tilt.dart';
@@ -54,17 +55,33 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
   // así que el carrete con menos cinta gira más rápido.
   static const _rMax = 0.1245, _rMin = 0.101, _rMid = 0.1128;
 
+  // Velocidad de los carretes (0..1 de la velocidad de reproducción): sube/baja con resorte.
+  double _speed = 0, _speedVel = 0;
+
   void _tick(Duration e) {
     final dt = (e - _last).inMicroseconds / 1e6;
     _last = e;
     if (dt <= 0 || dt > 0.5) return;
+    // Resorte críticamente amortiguado con un pequeño rebote hacia la velocidad objetivo.
+    final target = widget.playing ? 1.0 : 0.0;
+    const k = 38.0, c = 9.0;
+    _speedVel += (k * (target - _speed) - c * _speedVel) * dt;
+    _speed += _speedVel * dt;
+    if (_speed < 0) _speed = 0;
+    if (!widget.playing && _speed < 0.002 && _speedVel.abs() < 0.01) {
+      _speed = 0;
+      _speedVel = 0;
+      _ticker.stop();
+      return;
+    }
     final o = _st.overall;
     final rl = _rMax - (_rMax - _rMin) * o;
     final rr = _rMin + (_rMax - _rMin) * o;
     const w0 = 2.6; // rad/s con el rollo a medio radio
-    // Antihorario (negativo en pantalla), los dos igual, como al reproducir.
-    _st.aL -= w0 * _rMid / rl * dt;
-    _st.aR -= w0 * _rMid / rr * dt;
+    // Antihorario. El carrete con menos cinta (radio menor) gira más rápido; el de salida
+    // acelera a medida que avanza el cassette.
+    _st.aL -= w0 * _rMid / rl * dt * _speed;
+    _st.aR -= w0 * _rMid / rr * dt * _speed;
     _st.tick();
   }
 
@@ -73,11 +90,13 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
       _last = Duration.zero;
       _ticker.start();
     } else if (!widget.playing && _ticker.isActive) {
-      _ticker.stop();
+      // Se queda corriendo hasta que el resorte frene los carretes.
+    } else if (!widget.playing && !_ticker.isActive && _speed > 0) {
+      _last = Duration.zero;
+      _ticker.start();
     }
   }
 
-  @override
   VoidCallback? _releaseTilt;
 
   void _onTilt() {
@@ -250,7 +269,12 @@ class _Key extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: onTap == null
+            ? null
+            : () {
+                HapticFeedback.mediumImpact();
+                onTap!();
+              },
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2.5),

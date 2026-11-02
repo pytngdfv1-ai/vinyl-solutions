@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 
 import '../models/vinyl.dart';
 import 'vinyl_disc.dart';
@@ -103,6 +105,63 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
     duration: const Duration(milliseconds: 800),
   );
 
+  // Giro extra por el dedo / inercia (se suma al giro continuo del motor).
+  late final AnimationController _fling = AnimationController.unbounded(vsync: this)
+    ..addListener(() => _extra = _fling.value);
+  double _extra = 0;
+  Offset? _lastLocal;
+  Offset _discCenter = Offset.zero;
+  bool _dragging = false;
+
+  static const double _motorRadPerSec = 2 * math.pi / 1.8;
+
+  double _angleOf(Offset p) => math.atan2(p.dy - _discCenter.dy, p.dx - _discCenter.dx);
+
+  void _dragStart(DragStartDetails d) {
+    _fling.stop();
+    _dragging = true;
+    _lastLocal = d.localPosition;
+    if (_spin.isAnimating) _spin.stop(canceled: false); // el dedo manda mientras arrastras
+  }
+
+  void _dragUpdate(DragUpdateDetails d) {
+    final prev = _lastLocal;
+    if (prev == null) return;
+    var da = _angleOf(d.localPosition) - _angleOf(prev);
+    if (da > math.pi) da -= 2 * math.pi;
+    if (da < -math.pi) da += 2 * math.pi;
+    setState(() {
+      _extra += da;
+      _fling.value = _extra;
+    });
+    _lastLocal = d.localPosition;
+  }
+
+  void _dragEnd(DragEndDetails d) {
+    _dragging = false;
+    final p = _lastLocal ?? _discCenter;
+    final r = p - _discCenter;
+    final v = d.velocity.pixelsPerSecond;
+    final r2 = math.max(1.0, r.dx * r.dx + r.dy * r.dy);
+    final omega = (r.dx * v.dy - r.dy * v.dx) / r2; // rad/s (tangencial / radio)
+    _lastLocal = null;
+    _coast(omega.clamp(-40.0, 40.0).toDouble(), resumeMotor: widget.playing);
+  }
+
+  /// Inercia con rozamiento; al acabar, si sigue sonando, vuelve el motor.
+  void _coast(double omega, {required bool resumeMotor}) {
+    _fling.value = _extra;
+    if (omega.abs() < 0.2) {
+      if (resumeMotor) _spin.repeat();
+      return;
+    }
+    _fling
+        .animateWith(FrictionSimulation(0.12, _extra, omega, tolerance: const Tolerance(distance: 0.01, velocity: 0.05)))
+        .whenComplete(() {
+      if (mounted && !_dragging && widget.playing && !_spin.isAnimating) _spin.repeat();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,16 +177,22 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
   void _sync({bool initial = false}) {
     if (widget.playing) {
       if (initial) _arm.value = 1; // ya sonaba: el brazo aparece apoyado
-      _arm.forward();
-      _spin.repeat();
+      _arm.forward().whenComplete(() {
+        if (!initial && mounted) HapticFeedback.mediumImpact(); // la aguja toca el surco
+      });
+      if (!_dragging) _spin.repeat();
     } else {
       _arm.reverse();
-      _spin.stop();
+      if (_spin.isAnimating) {
+        _spin.stop(canceled: false);
+        _coast(_motorRadPerSec, resumeMotor: false); // el plato sigue girando por inercia y se detiene
+      }
     }
   }
 
   @override
   void dispose() {
+    _fling.dispose();
     _spin.dispose();
     _arm.dispose();
     super.dispose();
@@ -140,7 +205,17 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
       child: LayoutBuilder(
         builder: (context, c) {
           final g = _Geo(Size(c.maxWidth, c.maxHeight), scale: widget.scale);
-          return Stack(
+          _discCenter = g.center;
+          return Listener(
+            // Tocar el disco lo detiene (sin competir con el toque de play/pausa).
+            onPointerDown: (e) {
+              if ((e.localPosition - g.center).distance <= g.dr && _fling.isAnimating) _fling.stop();
+            },
+            child: GestureDetector(
+            onPanStart: _dragStart,
+            onPanUpdate: _dragUpdate,
+            onPanEnd: _dragEnd,
+            child: Stack(
             children: [
               Positioned.fill(
                 child: CustomPaint(painter: _DiscPainter(scale: widget.scale)),
@@ -152,11 +227,11 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
                   width: g.dr * 2,
                   height: g.dr * 2,
                   child: AnimatedBuilder(
-                    animation: _spin,
+                    animation: Listenable.merge([_spin, _fling]),
                     builder: (_, __) => VinylDisc(
                       vinyl: widget.vinyl,
                       diameter: g.dr * 2,
-                      spin: _spin.value * 2 * math.pi,
+                      spin: _spin.value * 2 * math.pi + _extra,
                       labelRatio: g.labelRatio,
                       tracks: widget.trackCount,
                     ),
@@ -181,6 +256,8 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
                 ),
               ),
             ],
+          ),
+          ),
           );
         },
       ),
