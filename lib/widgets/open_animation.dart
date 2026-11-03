@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../models/vinyl.dart';
 import '../data/ui_settings.dart';
 import 'cassette_body.dart';
+import 'cassette_card.dart';
 import 'cover_art.dart';
 import 'turntable.dart';
 import 'vinyl_disc.dart';
@@ -42,7 +43,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
   // Salida del sobre (0..1) y aterrizaje con resorte (sin límites: rebota).
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 950),
+    duration: Duration(milliseconds: _tape ? 3000 : 2200),
   );
   late final AnimationController _land = AnimationController.unbounded(vsync: this, value: 0);
   final ReelState _reels = ReelState();
@@ -90,7 +91,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
       // El cassette queda "encajado": clic háptico al llegar.
       HapticFeedback.mediumImpact();
     }
-    const spring = SpringDescription(mass: 1, stiffness: 230, damping: 15);
+    const spring = SpringDescription(mass: 1, stiffness: 110, damping: 12);
     _land
         .animateWith(SpringSimulation(spring, 0, 1, 2.2, tolerance: const Tolerance(distance: 0.004, velocity: 0.08)))
         .whenComplete(_finish);
@@ -205,7 +206,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     );
   }
 
-  // ---- Cassette: sale del empaque girando en perspectiva, se endereza y se desliza en la ranura ----
+  // ---- Cassette: el estuche se abre, el cassette sale, gira en perspectiva y se desliza en la ranura ----
   Widget _cassette(Rect bay, Rect? source) {
     final v = widget.vinyl;
     final cw = bay.width, ch = bay.height;
@@ -214,17 +215,19 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     final p = _c.value;
     final lv = _land.value;
     final landing = _land.value != 0;
-    final up = Curves.easeOutCubic.transform((p / 0.6).clamp(0.0, 1.0).toDouble());
-    final dn = Curves.easeInOutCubic.transform(((p - 0.6) / 0.4).clamp(0.0, 1.0).toDouble());
+    // Fases: 0–.22 abre el estuche · .22–.62 el cassette sale y sube · .62–1 baja y entra en la ranura.
+    final lid = Curves.easeInOut.transform((p / 0.22).clamp(0.0, 1.0).toDouble());
+    final up = Curves.easeOutCubic.transform(((p - 0.22) / 0.4).clamp(0.0, 1.0).toDouble());
+    final dn = Curves.easeInOutCubic.transform(((p - 0.62) / 0.38).clamp(0.0, 1.0).toDouble());
     final hover = bay.center + Offset(0, -ch * 1.15);
-    Offset pos = p < 0.6 ? Offset.lerp(src.center, hover, up)! : Offset.lerp(hover, bay.center, dn)!;
+    Offset pos = p < 0.62 ? Offset.lerp(src.center, hover, up)! : Offset.lerp(hover, bay.center, dn)!;
     if (landing) pos = bay.center + Offset(0, -ch * 0.12 * lv * (1 - lv));
     final s0 = (math.min(src.width, src.height) * 0.9 / cw).clamp(0.25, 0.9).toDouble();
-    final scale = p < 0.6 ? s0 + (1.12 - s0) * up : 1.12 + (1.0 - 1.12) * dn;
-    final rx = p < 0.6 ? 0.9 + (0.35 - 0.9) * up : 0.35 * (1 - dn);
-    final ry = p < 0.6 ? -0.7 + (-0.15 + 0.7) * up : -0.15 * (1 - dn);
-    final rz = p < 0.6 ? -math.pi / 2 * (1 - up) : 0.0; // vertical en el empaque, horizontal al insertar
-    final elev = (landing ? 0.0 : (p < 0.6 ? up : 1 - dn)).toDouble();
+    final scale = p < 0.62 ? s0 + (1.12 - s0) * up : 1.12 + (1.0 - 1.12) * dn;
+    final rx = p < 0.62 ? 0.9 + (0.35 - 0.9) * up : 0.35 * (1 - dn);
+    final ry = p < 0.62 ? -0.7 + (-0.15 + 0.7) * up : -0.15 * (1 - dn);
+    final rz = p < 0.62 ? -math.pi / 2 * (1 - up) : 0.0; // vertical en el estuche, horizontal al insertar
+    final elev = (landing ? 0.0 : (p < 0.62 ? up : 1 - dn)).toDouble();
     final fx = UiSettings.fx;
     final m = Matrix4.identity()
       ..setEntry(3, 2, fx ? 0.0012 : 0)
@@ -232,34 +235,71 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
       ..rotateY(fx ? ry : 0)
       ..rotateZ(rz)
       ..scale(scale);
-    return Positioned(
-      left: pos.dx - cw / 2,
-      top: pos.dy - ch / 2,
-      width: cw,
-      height: ch,
-      child: Transform(
-        alignment: Alignment.center,
-        transform: m,
-        child: RepaintBoundary(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(cw * 0.03),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.35 + 0.25 * elev),
-                  blurRadius: 4 + 30 * elev,
-                  offset: Offset(0, 3 + 24 * elev),
+    final lidFade = (1 - ((p - 0.3) / 0.25)).clamp(0.0, 1.0).toDouble();
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Estuche vacío (parte trasera), visible mientras el cassette sale.
+        if (lidFade > 0)
+          Positioned.fromRect(
+            rect: src,
+            child: Opacity(
+              opacity: lidFade,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Color(0xFF15161A),
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  boxShadow: [BoxShadow(color: Colors.black87, blurRadius: 10)],
                 ),
-              ],
+              ),
             ),
-            child: CassetteBody(
-              vinyl: v,
-              label: '${v.single && v.tracks.isNotEmpty ? v.tracks.first : (v.tracks.isNotEmpty ? v.tracks.first : v.title)} – ${v.artist}',
-              st: _reels,
+          ),
+        Positioned(
+          left: pos.dx - cw / 2,
+          top: pos.dy - ch / 2,
+          width: cw,
+          height: ch,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: m,
+            child: RepaintBoundary(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(cw * 0.03),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.35 + 0.25 * elev),
+                      blurRadius: 4 + 30 * elev,
+                      offset: Offset(0, 3 + 24 * elev),
+                    ),
+                  ],
+                ),
+                child: CassetteBody(
+                  vinyl: v,
+                  label:
+                      '${v.tracks.isNotEmpty ? v.tracks.first : v.title} – ${v.artist}',
+                  st: _reels,
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        // Tapa del estuche: gira sobre su borde izquierdo y se abre.
+        if (lidFade > 0)
+          Positioned.fromRect(
+            rect: src,
+            child: Opacity(
+              opacity: lidFade,
+              child: Transform(
+                alignment: Alignment.centerLeft,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.0014)
+                  ..rotateY(-1.45 * lid),
+                child: CassetteCard(vinyl: v),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

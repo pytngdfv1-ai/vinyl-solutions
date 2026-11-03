@@ -55,6 +55,7 @@ class _StageScreenState extends State<StageScreen> {
   final _coverKey = GlobalKey();
   final _bayKey = GlobalKey(); // ranura del casetero
   bool _ejecting = false;
+  late bool _inserted = !_anim; // cassette dentro del casetero
 
   Vinyl get v => widget.vinyl;
 
@@ -129,12 +130,15 @@ class _StageScreenState extends State<StageScreen> {
         onPrev: _prev,
         onNext: _next,
         bayKey: _bayKey,
-        hideCassette: _anim || _ejecting,
-        onEject: () {
+        hideCassette: _anim || _ejecting || !_inserted,
+        onEject: () async {
+          // EJECT: la música se detiene al instante y el cassette vuelve al estuche.
+          await _audio.stopIf(v.id);
+          if (!mounted) return;
           if (UiSettings.animations.value && UiSettings.fx) {
             setState(() => _ejecting = true);
           } else {
-            Navigator.of(context).pop();
+            setState(() => _inserted = false);
           }
         },
       );
@@ -150,7 +154,30 @@ class _StageScreenState extends State<StageScreen> {
     );
   }
 
+  bool get _isTape => v.cassette || v.single;
+
+  /// Toque en la portada: si es un cassette fuera del casetero, el estuche se abre, el cassette
+  /// cae en el deck y la portada gira para mostrar los temas; si no, solo da vuelta.
+  void _tapCover() {
+    if (_isTape && !_inserted && !_anim && !_ejecting) {
+      setState(() {
+        _flipped = true;
+        if (UiSettings.animations.value && UiSettings.fx) {
+          _anim = true;
+        } else {
+          _inserted = true;
+        }
+      });
+      return;
+    }
+    setState(() => _flipped = !_flipped);
+  }
+
   Future<void> _play() async {
+    if (_isTape && !_inserted) {
+      _tapCover();
+      return;
+    }
     if (!v.hasAudio) {
       setState(() => _simPlaying = true);
       return;
@@ -246,11 +273,15 @@ class _StageScreenState extends State<StageScreen> {
               sourceKey: _coverKey,
               onDone: () {
                 if (!mounted) return;
-                if (_ejecting) {
-                  Navigator.of(context).pop();
-                } else {
-                  setState(() => _anim = false);
-                }
+                setState(() {
+                  if (_ejecting) {
+                    _ejecting = false;
+                    _inserted = false;
+                  } else {
+                    _anim = false;
+                    _inserted = true;
+                  }
+                });
               },
             ),
           ),
@@ -330,7 +361,7 @@ class _StageScreenState extends State<StageScreen> {
                   final s = math.min(c.maxWidth - 32, c.maxHeight - 8);
                   return Center(
                     child: GestureDetector(
-                      onTap: () => setState(() => _flipped = !_flipped),
+                      onTap: _tapCover,
                       child: SizedBox(
                         key: _coverKey,
                         width: s,
