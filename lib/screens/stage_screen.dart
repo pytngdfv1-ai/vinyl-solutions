@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../audio/player_service.dart';
 import '../data/koofr_settings.dart';
@@ -1012,6 +1015,28 @@ class DetailSheet extends StatelessWidget {
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => CoverStudioScreen(store: store, target: v)),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('Usar mi propia imagen como portada'),
+                    onPressed: () async {
+                      final nav = Navigator.of(context);
+                      final r = await FilePicker.platform.pickFiles(type: FileType.image);
+                      final path = r?.files.single.path;
+                      if (path == null) return;
+                      final dir = Directory('${(await getApplicationDocumentsDirectory()).path}/portadas_propias');
+                      await dir.create(recursive: true);
+                      final ext = path.contains('.') ? path.substring(path.lastIndexOf('.')) : '.jpg';
+                      final safe = v.id.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+                      final dest = File('${dir.path}/$safe${DateTime.now().millisecondsSinceEpoch}$ext');
+                      await File(path).copy(dest.path);
+                      await store.setCover(v.id, dest.uri.toString());
+                      if (nav.mounted) nav.pop();
+                    },
                   ),
                 ),
                 if (v.coverUrl != null) ...[
