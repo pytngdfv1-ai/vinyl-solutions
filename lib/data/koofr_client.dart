@@ -371,7 +371,7 @@ class KoofrClient {
         final imgs0 = entries
             .where((e) => !e.isDir && _imageExt.any((x) => e.name.toLowerCase().endsWith(x)))
             .toList();
-        final pref0 = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
+        final pref0 = RegExp(r'^(cover|folder|front|album|artwork|portada|car[aá]tula)(\s*\d+)?\.', caseSensitive: false);
         final art0 = imgs0.where((e) => pref0.hasMatch(e.name)).firstOrNull ?? imgs0.firstOrNull;
         for (final e in audio) {
           out.add(AlbumDraft(
@@ -394,7 +394,7 @@ class KoofrClient {
         final images = entries
             .where((e) => !e.isDir && _imageExt.any((x) => e.name.toLowerCase().endsWith(x)))
             .toList();
-        final pref = RegExp(r'^(cover|folder|front|album|artwork)\.', caseSensitive: false);
+        final pref = RegExp(r'^(cover|folder|front|album|artwork|portada|car[aá]tula)(\s*\d+)?\.', caseSensitive: false);
         final art = images.where((e) => pref.hasMatch(e.name)).firstOrNull ?? images.firstOrNull;
         // Libreto: resto de imágenes y PDFs, más los de subcarpetas "Libreto", "Booklet"…
         final imgs = images.where((e) => e != art).toList()

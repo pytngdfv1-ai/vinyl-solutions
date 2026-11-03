@@ -20,8 +20,11 @@ String? backCoverOf(Vinyl v) {
 /// Cassette en 3D: frente (portada completa con relleno de color), lomo con degradado hasta
 /// el color de la parte posterior, y parte posterior (contraportada si existe, si no los temas).
 class Cassette3D extends StatefulWidget {
-  const Cassette3D({super.key, required this.vinyl});
+  const Cassette3D({super.key, required this.vinyl, this.tilt = 0});
   final Vinyl vinyl;
+
+  /// Giro fijo (rad) para ver el lomo, p. ej. en la ficha.
+  final double tilt;
 
   @override
   State<Cassette3D> createState() => _Cassette3DState();
@@ -69,18 +72,24 @@ class _Cassette3DState extends State<Cassette3D> {
               child: SizedBox(
                 width: ww,
                 height: hh,
-                child: Stack(
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, widget.tilt == 0 ? 0 : 0.0012)
+                    ..rotateY(widget.tilt),
+                  child: Stack(
                   alignment: Alignment.center,
                   clipBehavior: Clip.none,
                   children: [
                     face(ww, hh, Matrix4.identity()..translate(0.0, 0.0, t / 2)..rotateY(math.pi),
                         _BackFace(vinyl: v, backUrl: _back, base: b)),
                     face(t, hh, Matrix4.identity()..translate(-ww / 2, 0.0, 0.0)..rotateY(math.pi / 2),
-                        _Spine(from: b, to: a, text: '${v.artist} · $title', quarter: 1)),
+                        _Spine(from: b, to: a, text: '', quarter: 1)), // el nombre solo en un lado (el izquierdo de la pantalla)
                     face(t, hh, Matrix4.identity()..translate(ww / 2, 0.0, 0.0)..rotateY(-math.pi / 2),
                         _Spine(from: a, to: b, text: '${v.artist} · $title', quarter: 3)),
                     face(ww, hh, Matrix4.identity()..translate(0.0, 0.0, -t / 2), CassetteCard(vinyl: v)),
                   ],
+                ),
                 ),
               ),
             );
