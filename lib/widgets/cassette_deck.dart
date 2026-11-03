@@ -204,11 +204,18 @@ class _CassetteDeckState extends State<CassetteDeck> with SingleTickerProviderSt
                 height: ch,
                 child: KeyedSubtree(
                   key: widget.bayKey,
-                  child: Opacity(
-                    opacity: widget.hideCassette ? 0 : 1,
-                    child: RepaintBoundary(
-                      child: CassetteBody(vinyl: v, label: widget.label, sideB: sideB, st: _st),
-                    ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Compartimento vacío: mecanismo a la vista (cabezal, ejes, rodillos).
+                      const RepaintBoundary(child: CustomPaint(painter: _EmptyBayPainter())),
+                      Opacity(
+                        opacity: widget.hideCassette ? 0 : 1,
+                        child: RepaintBoundary(
+                          child: CassetteBody(vinyl: v, label: widget.label, sideB: sideB, st: _st),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -320,4 +327,139 @@ class _Key extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// Deck vacío: carcasa translúcida con el mecanismo a la vista (como un walkman transparente):
+/// ejes de carrete, cabezal con contactos, cabrestante y rodillo de presión.
+class _EmptyBayPainter extends CustomPainter {
+  const _EmptyBayPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final r = Radius.circular(w * 0.03);
+    final shell = RRect.fromRectAndRadius(Offset.zero & size, r);
+    canvas.drawRRect(
+      shell,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2F3236), Color(0xFF1B1D20), Color(0xFF26292D)],
+        ).createShader(Offset.zero & size),
+    );
+    // Placa metálica del mecanismo.
+    final plate = RRect.fromRectAndRadius(
+      Rect.fromLTRB(w * 0.045, h * 0.07, w * 0.955, h * 0.93),
+      Radius.circular(w * 0.02),
+    );
+    canvas.drawRRect(
+      plate,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF6B7078), Color(0xFF4A4E55), Color(0xFF5A5F67)],
+        ).createShader(plate.outerRect),
+    );
+    canvas.drawRRect(
+      plate,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0x55FFFFFF),
+    );
+    // Hueco donde asienta el cassette.
+    final seat = RRect.fromRectAndRadius(
+      Rect.fromLTRB(w * 0.07, h * 0.09, w * 0.93, h * 0.62),
+      Radius.circular(w * 0.015),
+    );
+    canvas.drawRRect(seat, Paint()..color = const Color(0xFF2A2D32));
+    canvas.drawRRect(
+      seat,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0x44000000),
+    );
+
+    // Ejes de los carretes (dientes) en las mismas posiciones que los del cassette.
+    for (final c in [Offset(w * 0.288, h * 0.359), Offset(w * 0.727, h * 0.359)]) {
+      final rr = h * 0.075;
+      canvas.drawCircle(c, rr * 1.25, Paint()..color = const Color(0xFF1B1D20));
+      canvas.drawCircle(
+        c,
+        rr,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(-0.3, -0.4),
+            colors: [Color(0xFFE4E7EA), Color(0xFF8E949B)],
+          ).createShader(Rect.fromCircle(center: c, radius: rr)),
+      );
+      final tooth = Paint()
+        ..color = const Color(0xFF3A3D42)
+        ..strokeWidth = rr * 0.22;
+      for (var i = 0; i < 6; i++) {
+        final a = i * math.pi / 3;
+        canvas.drawLine(c + Offset(math.cos(a), math.sin(a)) * rr * 0.45,
+            c + Offset(math.cos(a), math.sin(a)) * rr * 0.85, tooth);
+      }
+      canvas.drawCircle(c, rr * 0.3, Paint()..color = const Color(0xFF1E2023));
+    }
+
+    // Cabezal de lectura con contactos dorados, y cabrestante + rodillo de presión.
+    final head = RRect.fromRectAndRadius(
+      Rect.fromLTRB(w * 0.43, h * 0.66, w * 0.59, h * 0.84),
+      Radius.circular(w * 0.01),
+    );
+    canvas.drawRRect(head, Paint()..color = const Color(0xFFB8BDC3));
+    canvas.drawRRect(
+      head.deflate(w * 0.008),
+      Paint()..color = const Color(0xFF8A9097),
+    );
+    for (final x in [0.47, 0.55]) {
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset(w * x, h * 0.72), width: w * 0.022, height: h * 0.06),
+        Paint()..color = const Color(0xFFD8B04A),
+      );
+    }
+    canvas.drawCircle(Offset(w * 0.30, h * 0.77), h * 0.045, Paint()..color = const Color(0xFFD5D9DD));
+    canvas.drawCircle(Offset(w * 0.30, h * 0.77), h * 0.018, Paint()..color = const Color(0xFF6C7178));
+    canvas.drawCircle(Offset(w * 0.70, h * 0.77), h * 0.075, Paint()..color = const Color(0xFF0E0F10));
+    canvas.drawCircle(Offset(w * 0.70, h * 0.77), h * 0.032, Paint()..color = const Color(0xFF8E949B));
+    // Tornillos.
+    final screw = Paint()..color = const Color(0xFFC3C8CD);
+    for (final p in [
+      Offset(w * 0.075, h * 0.115),
+      Offset(w * 0.925, h * 0.115),
+      Offset(w * 0.075, h * 0.895),
+      Offset(w * 0.925, h * 0.895),
+    ]) {
+      canvas.drawCircle(p, w * 0.011, screw);
+    }
+    // Reflejo del plástico transparente.
+    canvas.save();
+    canvas.clipRRect(shell);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, w, h * 0.45),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0x22FFFFFF), Color(0x00FFFFFF)],
+        ).createShader(Rect.fromLTWH(0, 0, w, h * 0.45)),
+    );
+    canvas.restore();
+    canvas.drawRRect(
+      shell,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = const Color(0x99B8BCC2),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _EmptyBayPainter old) => false;
 }

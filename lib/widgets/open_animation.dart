@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import '../models/vinyl.dart';
 import '../data/ui_settings.dart';
 import 'cassette_body.dart';
-import 'cassette_card.dart';
+import 'cassette_case.dart';
 import 'cover_art.dart';
 import 'turntable.dart';
 import 'vinyl_disc.dart';
@@ -235,25 +235,14 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
       ..rotateY(fx ? ry : 0)
       ..rotateZ(rz)
       ..scale(scale);
-    final lidFade = (1 - ((p - 0.3) / 0.25)).clamp(0.0, 1.0).toDouble();
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Estuche vacío (parte trasera), visible mientras el cassette sale.
-        if (lidFade > 0)
-          Positioned.fromRect(
-            rect: src,
-            child: Opacity(
-              opacity: lidFade,
-              child: const DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Color(0xFF15161A),
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                  boxShadow: [BoxShadow(color: Colors.black87, blurRadius: 10)],
-                ),
-              ),
-            ),
-          ),
+        // Bandeja del estuche (con clavijas), siempre visible bajo el cassette.
+        Positioned.fromRect(
+          rect: src,
+          child: const Center(child: AspectRatio(aspectRatio: 0.63, child: CaseTray())),
+        ),
         Positioned(
           left: pos.dx - cw / 2,
           top: pos.dy - ch / 2,
@@ -284,21 +273,13 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
             ),
           ),
         ),
-        // Tapa del estuche: gira sobre su borde izquierdo y se abre.
-        if (lidFade > 0)
-          Positioned.fromRect(
-            rect: src,
-            child: Opacity(
-              opacity: lidFade,
-              child: Transform(
-                alignment: Alignment.centerLeft,
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.0014)
-                  ..rotateY(-1.45 * lid),
-                child: CassetteCard(vinyl: v),
-              ),
-            ),
+        // Tapa transparente del estuche: gira sobre su borde izquierdo (se abre al sacar, se cierra al guardar).
+        Positioned.fromRect(
+          rect: src,
+          child: Center(
+            child: AspectRatio(aspectRatio: 0.63, child: CaseLid(vinyl: v, angle: 1.45 * lid)),
           ),
+        ),
       ],
     );
   }
