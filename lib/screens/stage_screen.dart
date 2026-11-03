@@ -22,8 +22,7 @@ import '../data/classifier.dart';
 import '../data/cover_color.dart';
 import '../data/cover_lookup.dart';
 import '../data/koofr_client.dart';
-import '../widgets/cassette_3d.dart';
-import '../widgets/cassette_card.dart';
+import '../widgets/cassette_case.dart';
 import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
 import '../data/ui_settings.dart';
@@ -155,6 +154,7 @@ class _StageScreenState extends State<StageScreen> {
       trackCount: v.tracks.length,
       single: v.single,
       showDisc: !_anim,
+      holdArm: _anim,
       onGrab: _discGrab,
       onRelease: _discRelease,
       onScrub: _discScrub,
@@ -434,6 +434,7 @@ class _StageScreenState extends State<StageScreen> {
                               pages: _bookletPages(),
                               initial: _page,
                               onPage: (i) => _page = i,
+                              caseOpen: _isTape && _inserted && !_anim && !_ejecting,
                             ),
                           ),
                         ),
@@ -619,8 +620,8 @@ class _Info extends StatelessWidget {
 /// pellizca para ampliar. Al tocar, se da vuelta la tapa (lista de temas).
 /// Carátula de frente: los cassettes y temas sueltos se ven como en la biblioteca
 /// (portada completa con relleno de color y las etiquetas de artista y tema).
-Widget _front(Vinyl v) {
-  final base = (v.cassette || v.single) ? Cassette3D(vinyl: v, tilt: -0.42) : CoverArt(vinyl: v);
+Widget _front(Vinyl v, {bool caseOpen = false}) {
+  final base = (v.cassette || v.single) ? CassetteCase(vinyl: v, open: caseOpen) : CoverArt(vinyl: v);
   if (!UiSettings.fx) return base;
   // Desgaste procedural sobre la portada (rayas finas y polvo).
   return Stack(
@@ -642,8 +643,10 @@ class _Carousel extends StatefulWidget {
     required this.pages,
     required this.initial,
     required this.onPage,
+    this.caseOpen = false,
   });
 
+  final bool caseOpen;
   final Vinyl vinyl;
   final List<String> pages;
   final int initial;
@@ -674,7 +677,7 @@ class _CarouselState extends State<_Carousel> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.pages.isEmpty) return _front(widget.vinyl);
+    if (widget.pages.isEmpty) return _front(widget.vinyl, caseOpen: widget.caseOpen);
     const broken = Center(child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 48));
     return Stack(
       children: [
@@ -686,7 +689,7 @@ class _CarouselState extends State<_Carousel> {
             setState(() => _i = i);
           },
           itemBuilder: (_, i) {
-            if (i == 0) return _front(widget.vinyl);
+            if (i == 0) return _front(widget.vinyl, caseOpen: widget.caseOpen);
             return ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: ColoredBox(

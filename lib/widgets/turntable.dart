@@ -63,10 +63,14 @@ class Turntable extends StatefulWidget {
     this.trackCount = 1,
     this.single = false,
     this.showDisc = true,
+    this.holdArm = false,
     this.onGrab,
     this.onRelease,
     this.onScrub,
   });
+
+  /// El brazo se queda en reposo (levantado) mientras el disco viaja en la animación.
+  final bool holdArm;
 
   /// El dedo toca / suelta el disco (la música se pausa mientras se sostiene).
   final VoidCallback? onGrab, onRelease;
@@ -200,15 +204,19 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(covariant Turntable old) {
     super.didUpdateWidget(old);
-    if (old.playing != widget.playing) _sync();
+    if (old.playing != widget.playing || old.holdArm != widget.holdArm) _sync();
   }
 
   void _sync({bool initial = false}) {
     if (widget.playing) {
-      if (initial) _arm.value = 1; // ya sonaba: el brazo aparece apoyado
-      _arm.forward().whenComplete(() {
-        if (!initial && mounted) HapticFeedback.mediumImpact(); // la aguja toca el surco
-      });
+      if (widget.holdArm) {
+        _arm.value = 0; // brazo en reposo hasta que el disco esté en el plato
+      } else {
+        if (initial) _arm.value = 1; // ya sonaba: el brazo aparece apoyado
+        _arm.forward().whenComplete(() {
+          if (!initial && mounted) HapticFeedback.mediumImpact(); // la aguja toca el surco
+        });
+      }
       if (!_dragging && !_touching) _spin.repeat();
     } else {
       _arm.reverse();
