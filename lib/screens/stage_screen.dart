@@ -151,7 +151,60 @@ class _StageScreenState extends State<StageScreen> {
       trackCount: v.tracks.length,
       single: v.single,
       showDisc: !_anim,
+      onGrab: _discGrab,
+      onRelease: _discRelease,
+      onScrub: _discScrub,
     );
+  }
+
+  // --- Disco tocado: la música se detiene mientras lo sostienes; al girarlo con el dedo suena
+  //     más rápido (adelante) o retrocede (reversa) según la velocidad. ---
+  bool _wasPlaying = false;
+  bool _holding = false;
+  double _scrubRate = 0;
+  int _lastScrubMs = 0;
+  double _seekAccumMs = 0;
+
+  void _discGrab() {
+    if (!v.hasAudio || _audio.nowPlaying.value?.id != v.id) return;
+    _holding = true;
+    _wasPlaying = _audio.player.playing;
+    if (_wasPlaying) _audio.player.pause();
+  }
+
+  void _discScrub(double rate) {
+    if (!_holding) return;
+    final p = _audio.player;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final dt = _lastScrubMs == 0 ? 0 : math.min(200, now - _lastScrubMs);
+    _lastScrubMs = now;
+    _scrubRate = rate;
+    if (rate > 0.15) {
+      // Adelante: suena a la velocidad del giro.
+      p.setSpeed(rate.clamp(0.3, 3.0).toDouble());
+      if (!p.playing) p.play();
+    } else if (rate < -0.15) {
+      // Reversa: el audio retrocede según la velocidad (sin sonido, como un rebobinado).
+      if (p.playing) p.pause();
+      _seekAccumMs += rate * dt; // negativo
+      if (_seekAccumMs.abs() >= 120) {
+        final target = p.position + Duration(milliseconds: _seekAccumMs.round());
+        p.seek(target < Duration.zero ? Duration.zero : target);
+        _seekAccumMs = 0;
+      }
+    } else if (p.playing) {
+      p.pause();
+    }
+  }
+
+  void _discRelease() {
+    if (!_holding) return;
+    _holding = false;
+    _lastScrubMs = 0;
+    _seekAccumMs = 0;
+    final p = _audio.player;
+    p.setSpeed(1.0);
+    if (_wasPlaying) p.play();
   }
 
   bool get _isTape => v.cassette || v.single;
