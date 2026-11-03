@@ -19,6 +19,7 @@ import '../data/classifier.dart';
 import '../data/cover_color.dart';
 import '../data/cover_lookup.dart';
 import '../data/koofr_client.dart';
+import '../widgets/cassette_3d.dart';
 import '../widgets/cassette_card.dart';
 import '../widgets/cassette_deck.dart';
 import '../widgets/cover_art.dart';
@@ -616,7 +617,7 @@ class _Info extends StatelessWidget {
 /// Carátula de frente: los cassettes y temas sueltos se ven como en la biblioteca
 /// (portada completa con relleno de color y las etiquetas de artista y tema).
 Widget _front(Vinyl v) {
-  final base = (v.cassette || v.single) ? CassetteCard(vinyl: v) : CoverArt(vinyl: v);
+  final base = (v.cassette || v.single) ? Cassette3D(vinyl: v, tilt: -0.42) : CoverArt(vinyl: v);
   if (!UiSettings.fx) return base;
   // Desgaste procedural sobre la portada (rayas finas y polvo).
   return Stack(
