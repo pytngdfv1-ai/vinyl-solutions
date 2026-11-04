@@ -408,26 +408,28 @@ class _EmptyBayPainter extends CustomPainter {
       canvas.drawCircle(c, rr * 0.3, Paint()..color = const Color(0xFF1E2023));
     }
 
-    // Cabezal de lectura con contactos dorados, y cabrestante + rodillo de presión.
+    // Cabezal de lectura con contactos dorados, asomando por el borde inferior (centro),
+    // y cabrestante + rodillo de presión a los lados (donde van los del cassette).
     final head = RRect.fromRectAndRadius(
-      Rect.fromLTRB(w * 0.43, h * 0.66, w * 0.59, h * 0.84),
+      Rect.fromLTRB(w * 0.42, h * 0.845, w * 0.59, h * 0.985),
       Radius.circular(w * 0.01),
     );
+    canvas.drawRRect(head.shift(Offset(0, h * 0.01)), Paint()..color = Colors.black54);
     canvas.drawRRect(head, Paint()..color = const Color(0xFFB8BDC3));
     canvas.drawRRect(
       head.deflate(w * 0.008),
       Paint()..color = const Color(0xFF8A9097),
     );
-    for (final x in [0.47, 0.55]) {
+    for (final x in [0.465, 0.545]) {
       canvas.drawRect(
-        Rect.fromCenter(center: Offset(w * x, h * 0.72), width: w * 0.022, height: h * 0.06),
+        Rect.fromCenter(center: Offset(w * x, h * 0.905), width: w * 0.022, height: h * 0.06),
         Paint()..color = const Color(0xFFD8B04A),
       );
     }
-    canvas.drawCircle(Offset(w * 0.30, h * 0.77), h * 0.045, Paint()..color = const Color(0xFFD5D9DD));
-    canvas.drawCircle(Offset(w * 0.30, h * 0.77), h * 0.018, Paint()..color = const Color(0xFF6C7178));
-    canvas.drawCircle(Offset(w * 0.70, h * 0.77), h * 0.075, Paint()..color = const Color(0xFF0E0F10));
-    canvas.drawCircle(Offset(w * 0.70, h * 0.77), h * 0.032, Paint()..color = const Color(0xFF8E949B));
+    canvas.drawCircle(Offset(w * 0.27, h * 0.915), h * 0.042, Paint()..color = const Color(0xFFD5D9DD));
+    canvas.drawCircle(Offset(w * 0.27, h * 0.915), h * 0.017, Paint()..color = const Color(0xFF6C7178));
+    canvas.drawCircle(Offset(w * 0.751, h * 0.915), h * 0.062, Paint()..color = const Color(0xFF0E0F10));
+    canvas.drawCircle(Offset(w * 0.751, h * 0.915), h * 0.028, Paint()..color = const Color(0xFF8E949B));
     // Tornillos.
     final screw = Paint()..color = const Color(0xFFC3C8CD);
     for (final p in [
