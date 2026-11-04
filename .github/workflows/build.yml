@@ -92,5 +92,14 @@ jobs:
         run: |
           VER=$(tr -d ' \r\n' < VERSION)
           cp build/app/outputs/flutter-apk/app-release.apk MiBiblioteca.apk
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest MiBiblioteca.apk --title "Mi Biblioteca $VER" --notes "APK firmado. Descárgalo e instálalo encima de la versión anterior (se conserva todo)."
+          ok=""
+          for i in 1 2 3 4 5; do
+            gh release delete latest --yes --cleanup-tag || true
+            if gh release create latest MiBiblioteca.apk --title "Mi Biblioteca $VER" --notes "APK firmado. Descárgalo e instálalo encima de la versión anterior (se conserva todo)."; then
+              ok=1
+              break
+            fi
+            echo "Intento $i falló; reintentando en 45 s"
+            sleep 45
+          done
+          [ -n "$ok" ] || exit 1
