@@ -5,7 +5,6 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import '../models/vinyl.dart';
-import '../data/ui_settings.dart';
 import 'cassette_body.dart';
 import 'cassette_case.dart';
 import 'cover_art.dart';
@@ -215,24 +214,30 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     final p = _c.value;
     final lv = _land.value;
     final landing = _land.value != 0;
-    // Fases: 0–.22 abre el estuche · .22–.62 el cassette sale y sube · .62–1 baja y entra en la ranura.
-    final lid = Curves.easeInOut.transform((p / 0.22).clamp(0.0, 1.0).toDouble());
-    final up = Curves.easeOutCubic.transform(((p - 0.22) / 0.4).clamp(0.0, 1.0).toDouble());
+    // Recorrido limpio, sin inclinaciones 3D (así no entra "chanfleado"):
+    //  0–.18 se abre la tapa · .18–.40 sale recto del estuche (vertical) ·
+    //  .40–.62 gira plano 90° y crece hasta el tamaño del deck · .62–1 baja recto a la ranura.
+    final caseH = src.height, caseW = caseH * 0.63;
+    final sCase = math.min(caseH * 0.88 / cw, caseW * 0.80 / ch).toDouble();
+    final lid = Curves.easeInOut.transform((p / 0.18).clamp(0.0, 1.0).toDouble());
+    final out = Curves.easeOutCubic.transform(((p - 0.18) / 0.22).clamp(0.0, 1.0).toDouble());
+    final turn = Curves.easeInOutCubic.transform(((p - 0.40) / 0.22).clamp(0.0, 1.0).toDouble());
     final dn = Curves.easeInOutCubic.transform(((p - 0.62) / 0.38).clamp(0.0, 1.0).toDouble());
+    final lifted = src.center + Offset(0, -caseH * 0.95);
     final hover = bay.center + Offset(0, -ch * 1.15);
-    Offset pos = p < 0.62 ? Offset.lerp(src.center, hover, up)! : Offset.lerp(hover, bay.center, dn)!;
-    if (landing) pos = bay.center + Offset(0, -ch * 0.12 * lv * (1 - lv));
-    final s0 = (math.min(src.width, src.height) * 0.9 / cw).clamp(0.25, 0.9).toDouble();
-    final scale = p < 0.62 ? s0 + (1.12 - s0) * up : 1.12 + (1.0 - 1.12) * dn;
-    final rx = p < 0.62 ? 0.9 + (0.35 - 0.9) * up : 0.35 * (1 - dn);
-    final ry = p < 0.62 ? -0.7 + (-0.15 + 0.7) * up : -0.15 * (1 - dn);
-    final rz = p < 0.62 ? -math.pi / 2 * (1 - up) : 0.0; // vertical en el estuche, horizontal al insertar
-    final elev = (landing ? 0.0 : (p < 0.62 ? up : 1 - dn)).toDouble();
-    final fx = UiSettings.fx;
+    Offset pos;
+    if (p < 0.40) {
+      pos = Offset.lerp(src.center, lifted, out)!;
+    } else if (p < 0.62) {
+      pos = Offset.lerp(lifted, hover, turn)!;
+    } else {
+      pos = Offset.lerp(hover, bay.center, dn)!;
+    }
+    if (landing) pos = bay.center + Offset(0, -ch * 0.06 * lv * (1 - lv));
+    final scale = p < 0.40 ? sCase : (p < 0.62 ? sCase + (1.0 - sCase) * turn : 1.0);
+    final rz = p < 0.40 ? -math.pi / 2 : (p < 0.62 ? -math.pi / 2 * (1 - turn) : 0.0);
+    final elev = (landing ? 0.0 : (p < 0.40 ? out * 0.4 : (p < 0.62 ? 0.4 + 0.6 * turn : 1 - dn))).toDouble();
     final m = Matrix4.identity()
-      ..setEntry(3, 2, fx ? 0.0012 : 0)
-      ..rotateX(fx ? rx : 0)
-      ..rotateY(fx ? ry : 0)
       ..rotateZ(rz)
       ..scale(scale);
     return Stack(
