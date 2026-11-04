@@ -21,17 +21,22 @@ class CassetteCase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final a = lid > 0 ? lid : (open ? 1.0 : 0.0);
-    return Center(
-      child: AspectRatio(
-        aspectRatio: 0.63,
-        child: Stack(
-          clipBehavior: Clip.none,
-          fit: StackFit.expand,
-          children: [
-            CaseTray(showPegs: a > 0),
-            CaseLid(vinyl: vinyl, angle: 1.45 * a),
-          ],
+    final target = lid > 0 ? lid : (open ? 1.0 : 0.0);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: target),
+      duration: lid > 0 ? Duration.zero : const Duration(milliseconds: 1000),
+      curve: Curves.easeInOut,
+      builder: (context, a, _) => Center(
+        child: AspectRatio(
+          aspectRatio: 0.63,
+          child: Stack(
+            clipBehavior: Clip.none,
+            fit: StackFit.expand,
+            children: [
+              CaseTray(showPegs: a > 0.02),
+              CaseLid(vinyl: vinyl, angle: 1.45 * a),
+            ],
+          ),
         ),
       ),
     );
