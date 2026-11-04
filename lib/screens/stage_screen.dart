@@ -59,6 +59,7 @@ class _StageScreenState extends State<StageScreen> {
   final _bayKey = GlobalKey(); // ranura del casetero
   bool _ejecting = false;
   late bool _inserted = !_anim; // cassette dentro del casetero
+  bool _closingForFlip = false; // la tapa se cierra antes de dar vuelta el estuche
 
   Vinyl get v => widget.vinyl;
 
@@ -134,16 +135,7 @@ class _StageScreenState extends State<StageScreen> {
         onNext: _next,
         bayKey: _bayKey,
         hideCassette: _anim || _ejecting || !_inserted,
-        onEject: () async {
-          // EJECT: la música se detiene al instante y el cassette vuelve al estuche.
-          await _audio.stopIf(v.id);
-          if (!mounted) return;
-          if (UiSettings.animations.value && UiSettings.fx) {
-            setState(() => _ejecting = true);
-          } else {
-            setState(() => _inserted = false);
-          }
-        },
+        onEject: _eject,
       );
     }
     return Turntable(
@@ -213,12 +205,58 @@ class _StageScreenState extends State<StageScreen> {
 
   bool get _isTape => v.cassette || v.single;
 
-  /// Toque en la portada: si es un cassette fuera del casetero, el estuche se abre, el cassette
-  /// cae en el deck y la portada gira para mostrar los temas; si no, solo da vuelta.
-  void _tapCover() {
-    if (_isTape && !_inserted && !_anim && !_ejecting) {
+  /// EJECT: la música se detiene; si el estuche estaba de espaldas gira lento hasta mostrar la
+  /// portada; luego se abre, el cassette entra y la tapa se cierra.
+  Future<void> _eject() async {
+    if (_ejecting || _anim) return;
+    await _audio.stopIf(v.id);
+    if (!mounted) return;
+    if (_flipped) {
+      setState(() => _flipped = false);
+      await Future.delayed(const Duration(milliseconds: 1400));
+      if (!mounted) return;
+    }
+    if (UiSettings.animations.value && UiSettings.fx) {
+      setState(() => _ejecting = true);
+    } else {
+      setState(() => _inserted = false);
+    }
+  }
+
+  /// Da vuelta el estuche: si está abierto, primero se cierra y luego gira para mostrar los temas.
+  Future<void> _flipCase() async {
+    if (_flipBusy) return;
+    _flipBusy = true;
+    try {
+      if (!_flipped && _isTape && _inserted) {
+        setState(() => _closingForFlip = true);
+        await Future.delayed(const Duration(milliseconds: 1050));
+        if (!mounted) return;
+        setState(() {
+          _flipped = true;
+          _closingForFlip = false;
+        });
+      } else {
+        setState(() => _flipped = !_flipped);
+      }
+    } finally {
+      _flipBusy = false;
+    }
+  }
+
+  bool _flipBusy = false;
+
+  /// Toque en la portada: con el cassette fuera, el estuche se abre y el cassette cae en el deck;
+  /// con el cassette dentro, el estuche se cierra y gira para mostrar los temas.
+  Future<void> _tapCover() async {
+    if (_anim || _ejecting) return;
+    if (_isTape && !_inserted) {
+      if (_flipped) {
+        setState(() => _flipped = false);
+        await Future.delayed(const Duration(milliseconds: 1400));
+        if (!mounted) return;
+      }
       setState(() {
-        _flipped = true;
         if (UiSettings.animations.value && UiSettings.fx) {
           _anim = true;
         } else {
@@ -227,7 +265,7 @@ class _StageScreenState extends State<StageScreen> {
       });
       return;
     }
-    setState(() => _flipped = !_flipped);
+    await _flipCase();
   }
 
   Future<void> _play() async {
@@ -339,6 +377,8 @@ class _StageScreenState extends State<StageScreen> {
                     _inserted = true;
                   }
                 });
+                // Tras insertar: el estuche vacío se cierra y gira para mostrar los temas.
+                if (_isTape && _inserted && !_flipped) _flipCase();
               },
             ),
           ),
@@ -434,7 +474,7 @@ class _StageScreenState extends State<StageScreen> {
                               pages: _bookletPages(),
                               initial: _page,
                               onPage: (i) => _page = i,
-                              caseOpen: _isTape && _inserted && !_anim && !_ejecting,
+                              caseOpen: _isTape && !_flipped && !_closingForFlip && ((_inserted && !_ejecting) || _anim),
                             ),
                           ),
                         ),
@@ -754,7 +794,7 @@ class _FlipCover extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: flipped ? 1 : 0),
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 1300),
       curve: Curves.easeInOutCubic,
       builder: (context, v, _) {
         final back = v > 0.5;

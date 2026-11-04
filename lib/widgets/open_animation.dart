@@ -42,8 +42,10 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
   // Salida del sobre (0..1) y aterrizaje con resorte (sin límites: rebota).
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: _tape ? 3000 : 2200),
+    duration: Duration(milliseconds: _tape ? 3800 : 2800),
   );
+  // Solo al expulsar: antes de sacar el cassette, la tapa del estuche se abre.
+  late final AnimationController _pre = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
   late final AnimationController _land = AnimationController.unbounded(vsync: this, value: 0);
   final ReelState _reels = ReelState();
   Rect? _target, _source;
@@ -62,7 +64,9 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
       }
       if (widget.reverse) {
         _c.value = 1;
-        _c.reverse().whenComplete(_finish);
+        _pre.forward().whenComplete(() {
+          if (mounted) _c.reverse().whenComplete(_finish);
+        });
       } else {
         _c.forward().whenComplete(_landing);
       }
@@ -106,6 +110,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
   @override
   void dispose() {
     _c.dispose();
+    _pre.dispose();
     _land.dispose();
     super.dispose();
   }
@@ -118,7 +123,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
       behavior: HitTestBehavior.opaque,
       onTap: _finish,
       child: AnimatedBuilder(
-        animation: Listenable.merge([_c, _land]),
+        animation: Listenable.merge([_c, _land, _pre]),
         builder: (context, _) {
           final t = _target;
           if (t == null) return const SizedBox.expand();
@@ -219,7 +224,8 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     //  .40–.62 gira plano 90° y crece hasta el tamaño del deck · .62–1 baja recto a la ranura.
     final caseH = src.height, caseW = caseH * 0.63;
     final sCase = math.min(caseH * 0.88 / cw, caseW * 0.80 / ch).toDouble();
-    final lid = Curves.easeInOut.transform((p / 0.18).clamp(0.0, 1.0).toDouble());
+    var lid = Curves.easeInOut.transform((p / 0.18).clamp(0.0, 1.0).toDouble());
+    if (widget.reverse && !_pre.isCompleted) lid = Curves.easeInOut.transform(_pre.value);
     final out = Curves.easeOutCubic.transform(((p - 0.18) / 0.22).clamp(0.0, 1.0).toDouble());
     final turn = Curves.easeInOutCubic.transform(((p - 0.40) / 0.22).clamp(0.0, 1.0).toDouble());
     final dn = Curves.easeInOutCubic.transform(((p - 0.62) / 0.38).clamp(0.0, 1.0).toDouble());

@@ -115,7 +115,7 @@ class _TurntableState extends State<Turntable> with TickerProviderStateMixin {
   );
   late final AnimationController _arm = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 800),
+    duration: const Duration(milliseconds: 1000),
   );
 
   // Giro extra por el dedo / inercia (se suma al giro continuo del motor).
