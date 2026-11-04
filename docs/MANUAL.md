@@ -176,3 +176,5 @@ Comprueba tu conexión. La app avisa si Koofr no responde y reintenta al abrir e
 ### ¿Mis datos están seguros?
 
 Todo vive en tu dispositivo. Solo se contacta a internet para buscar portadas, letras y libretos, y para hablar con tu nube.
+
+<!-- v1.07: recorrido del cassette y cabezal del deck -->
