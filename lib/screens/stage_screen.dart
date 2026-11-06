@@ -53,7 +53,10 @@ class _StageScreenState extends State<StageScreen> {
   String? _error;
   Color? _bg; // color de la portada (fondo del reproductor)
   int _page = 0; // página del carrusel (0 = carátula)
-  bool _anim = UiSettings.animations.value && UiSettings.fx; // animación de apertura en curso
+  // Animación de apertura en curso: no se repite si este disco ya está sonando (volver desde otra biblioteca).
+  late bool _anim = UiSettings.animations.value &&
+      UiSettings.fx &&
+      _audio.nowPlaying.value?.id != v.id;
   final _visKey = GlobalKey();
   final _coverKey = GlobalKey();
   final _bayKey = GlobalKey(); // ranura del casetero
