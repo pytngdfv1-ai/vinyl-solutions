@@ -33,8 +33,8 @@ class CassetteCase extends StatelessWidget {
             clipBehavior: Clip.none,
             fit: StackFit.expand,
             children: [
-              CaseTray(showPegs: a > 0.02),
-              CaseLid(vinyl: vinyl, angle: 1.45 * a),
+              CaseTray(vinyl: vinyl, showPegs: a > 0.02),
+              CaseLid(vinyl: vinyl, angle: math.pi * a),
             ],
           ),
         ),
@@ -45,12 +45,30 @@ class CassetteCase extends StatelessWidget {
 
 /// Bandeja del estuche: plástico traslúcido, hueco oscuro, bisagra y clavijas.
 class CaseTray extends StatelessWidget {
-  const CaseTray({super.key, this.showPegs = true});
+  const CaseTray({super.key, this.vinyl, this.showPegs = true});
+  final Vinyl? vinyl;
   final bool showPegs;
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(painter: _TrayPainter(showPegs));
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        CustomPaint(painter: _TrayPainter(showPegs)),
+        // El cassette descansa sobre la cara de la portada.
+        if (vinyl != null)
+          LayoutBuilder(builder: (context, c) {
+            final w = c.maxWidth, h = c.maxHeight;
+            return Positioned.fromRect(
+              rect: Rect.fromLTRB(w * 0.11, h * 0.035, w * 0.96, h * 0.965),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(w * 0.03),
+                child: CassetteCard(vinyl: vinyl!),
+              ),
+            );
+          }),
+      ],
+    );
   }
 }
 
@@ -117,7 +135,8 @@ class _TrayPainter extends CustomPainter {
   bool shouldRepaint(covariant _TrayPainter old) => old.pegs != pegs;
 }
 
-/// Tapa de plástico transparente con la portada; gira sobre su borde izquierdo.
+/// Tapa de plástico transparente. Cerrada muestra la portada; al abrirse más de 90° se ve su
+/// cara interna con la lista de temas (adaptada al rectángulo de la tapa).
 class CaseLid extends StatelessWidget {
   const CaseLid({super.key, required this.vinyl, this.angle = 0});
   final Vinyl vinyl;
@@ -125,36 +144,108 @@ class CaseLid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Transform(
-      alignment: Alignment.centerLeft,
-      transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.0014)
-        ..rotateY(-angle),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // La portada va impresa en el papel dentro de la tapa.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(2, 2, 2, 2),
-            child: CassetteCard(vinyl: vinyl),
-          ),
-          // Plástico transparente con brillo y borde.
-          IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.white60, width: 1.3),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0x44FFFFFF), Color(0x0FFFFFFF), Color(0x33FFFFFF)],
-                  stops: [0, 0.55, 1],
+    final inner = angle > math.pi / 2;
+    final face = inner
+        ? Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(math.pi), // la cara interna se ve al revés: se corrige
+            child: _LidTracks(vinyl: vinyl),
+          )
+        : Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(2),
+                child: CassetteCard(vinyl: vinyl),
+              ),
+              IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white60, width: 1.3),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0x44FFFFFF), Color(0x0FFFFFFF), Color(0x33FFFFFF)],
+                      stops: [0, 0.55, 1],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+    return Transform(
+      alignment: Alignment.centerLeft,
+      // Se abre hacia el frente (hacia quien mira), con perspectiva marcada: el borde exterior crece.
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.0035)
+        ..rotateY(-angle),
+      child: face,
+    );
+  }
+}
+
+/// Cara interna de la tapa: lista de temas sobre plástico oscuro.
+class _LidTracks extends StatelessWidget {
+  const _LidTracks({required this.vinyl});
+  final Vinyl vinyl;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = vinyl.tracks;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white54, width: 1.3),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2A2E33), Color(0xFF1B1E22)],
+        ),
       ),
+      child: LayoutBuilder(builder: (context, c) {
+        final fs = c.maxWidth * 0.075;
+        return Padding(
+          padding: EdgeInsets.all(c.maxWidth * 0.07),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                vinyl.artist.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white70, fontSize: fs * 0.9, letterSpacing: 1.2),
+              ),
+              Text(
+                vinyl.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: fs * 1.25),
+              ),
+              Divider(color: Colors.white24, height: fs),
+              Expanded(
+                child: ClipRect(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < t.length && i < 30; i++)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: fs * 0.25),
+                          child: Text(
+                            '${i + 1}. ${t[i]}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: fs * 0.95),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
     );
   }
 }

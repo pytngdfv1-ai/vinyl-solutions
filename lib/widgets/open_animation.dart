@@ -246,7 +246,18 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     final m = Matrix4.identity()
       ..rotateZ(rz)
       ..scale(scale);
-    return Stack(
+    // Vista de perfil mientras el cassette sale/entra del estuche; se endereza al volar al deck.
+    final side = 0.85 * (1 - turn);
+    return LayoutBuilder(builder: (context, box) {
+      return Transform(
+        alignment: Alignment(
+          (src.center.dx / box.maxWidth) * 2 - 1,
+          (src.center.dy / box.maxHeight) * 2 - 1,
+        ),
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.0012)
+          ..rotateY(side),
+        child: Stack(
       clipBehavior: Clip.none,
       children: [
         // Bandeja del estuche (con clavijas), siempre visible bajo el cassette.
@@ -288,10 +299,12 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
         Positioned.fromRect(
           rect: src,
           child: Center(
-            child: AspectRatio(aspectRatio: 0.63, child: CaseLid(vinyl: v, angle: 1.45 * lid)),
+            child: AspectRatio(aspectRatio: 0.63, child: CaseLid(vinyl: v, angle: math.pi * lid)),
           ),
         ),
       ],
-    );
+    ),
+      );
+    });
   }
 }
