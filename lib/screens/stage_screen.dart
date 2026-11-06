@@ -102,8 +102,20 @@ class _StageScreenState extends State<StageScreen> {
     if (_audio.nowPlaying.value?.id == v.id) return;
     // Si otro disco está sonando, no lo interrumpas: solo se cambia al elegir un tema.
     if (_audio.nowPlaying.value != null && _audio.player.playing) return;
-    await Future.delayed(const Duration(milliseconds: 650));
+    // La música empieza cuando el disco/cassette ya está en su sitio (cassette: 2 s después de entrar).
+    while (mounted && (_anim || _ejecting)) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    await Future.delayed(Duration(milliseconds: _isTape ? 2000 : 650));
     if (!mounted) return;
+    await _ensureLoaded();
+  }
+
+  /// Tras volver a insertar un cassette: la música arranca 2 s después de que entre en el deck.
+  Future<void> _autoPlayLater() async {
+    await Future.delayed(const Duration(milliseconds: 2000));
+    if (!mounted || !_inserted || _ejecting || _anim) return;
+    if (_audio.nowPlaying.value?.id == v.id) return;
     await _ensureLoaded();
   }
 
@@ -248,6 +260,7 @@ class _StageScreenState extends State<StageScreen> {
   }
 
   bool _flipBusy = false;
+  bool _reinsert = false; // inserción por toque (no la inicial): arranca la música sola
 
   /// Toque en la portada: con el cassette fuera, el estuche se abre y el cassette cae en el deck;
   /// con el cassette dentro, el estuche se cierra y gira para mostrar los temas.
@@ -260,6 +273,7 @@ class _StageScreenState extends State<StageScreen> {
         if (!mounted) return;
       }
       setState(() {
+        _reinsert = true;
         if (UiSettings.animations.value && UiSettings.fx) {
           _anim = true;
         } else {
@@ -382,6 +396,10 @@ class _StageScreenState extends State<StageScreen> {
                 });
                 // Tras insertar: el estuche vacío se cierra y gira para mostrar los temas.
                 if (_isTape && _inserted && !_flipped) _flipCase();
+                if (_reinsert && _isTape && _inserted) {
+                  _reinsert = false;
+                  _autoPlayLater();
+                }
               },
             ),
           ),
