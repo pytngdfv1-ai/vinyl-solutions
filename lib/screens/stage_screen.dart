@@ -62,7 +62,6 @@ class _StageScreenState extends State<StageScreen> {
   final _bayKey = GlobalKey(); // ranura del casetero
   bool _ejecting = false;
   late bool _inserted = !_anim; // cassette dentro del casetero
-  bool _closingForFlip = false; // la tapa se cierra antes de dar vuelta el estuche
 
   Vinyl get v => widget.vinyl;
 
@@ -238,28 +237,6 @@ class _StageScreenState extends State<StageScreen> {
     }
   }
 
-  /// Da vuelta el estuche: si está abierto, primero se cierra y luego gira para mostrar los temas.
-  Future<void> _flipCase() async {
-    if (_flipBusy) return;
-    _flipBusy = true;
-    try {
-      if (!_flipped && _isTape && _inserted) {
-        setState(() => _closingForFlip = true);
-        await Future.delayed(const Duration(milliseconds: 1050));
-        if (!mounted) return;
-        setState(() {
-          _flipped = true;
-          _closingForFlip = false;
-        });
-      } else {
-        setState(() => _flipped = !_flipped);
-      }
-    } finally {
-      _flipBusy = false;
-    }
-  }
-
-  bool _flipBusy = false;
   bool _reinsert = false; // inserción por toque (no la inicial): arranca la música sola
 
   /// Toque en la portada: con el cassette fuera, el estuche se abre y el cassette cae en el deck;
@@ -282,7 +259,7 @@ class _StageScreenState extends State<StageScreen> {
       });
       return;
     }
-    await _flipCase();
+    setState(() => _flipped = !_flipped);
   }
 
   Future<void> _play() async {
@@ -394,8 +371,6 @@ class _StageScreenState extends State<StageScreen> {
                     _inserted = true;
                   }
                 });
-                // Tras insertar: el estuche vacío se cierra y gira para mostrar los temas.
-                if (_isTape && _inserted && !_flipped) _flipCase();
                 if (_reinsert && _isTape && _inserted) {
                   _reinsert = false;
                   _autoPlayLater();
@@ -495,7 +470,7 @@ class _StageScreenState extends State<StageScreen> {
                               pages: _bookletPages(),
                               initial: _page,
                               onPage: (i) => _page = i,
-                              caseOpen: _isTape && !_flipped && !_closingForFlip && ((_inserted && !_ejecting) || _anim),
+                              caseOpen: false,
                             ),
                           ),
                         ),

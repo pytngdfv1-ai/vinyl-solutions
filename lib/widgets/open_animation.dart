@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 
 import '../models/vinyl.dart';
 import 'cassette_body.dart';
-import 'cassette_case.dart';
 import 'cover_art.dart';
 import 'turntable.dart';
 import 'vinyl_disc.dart';
@@ -44,8 +43,6 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     vsync: this,
     duration: Duration(milliseconds: _tape ? 3800 : 2800),
   );
-  // Solo al expulsar: antes de sacar el cassette, la tapa del estuche se abre.
-  late final AnimationController _pre = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
   late final AnimationController _land = AnimationController.unbounded(vsync: this, value: 0);
   final ReelState _reels = ReelState();
   Rect? _target, _source;
@@ -64,9 +61,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
       }
       if (widget.reverse) {
         _c.value = 1;
-        _pre.forward().whenComplete(() {
-          if (mounted) _c.reverse().whenComplete(_finish);
-        });
+        _c.reverse().whenComplete(_finish);
       } else {
         _c.forward().whenComplete(_landing);
       }
@@ -110,7 +105,6 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
   @override
   void dispose() {
     _c.dispose();
-    _pre.dispose();
     _land.dispose();
     super.dispose();
   }
@@ -123,7 +117,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
       behavior: HitTestBehavior.opaque,
       onTap: _finish,
       child: AnimatedBuilder(
-        animation: Listenable.merge([_c, _land, _pre]),
+        animation: Listenable.merge([_c, _land]),
         builder: (context, _) {
           final t = _target;
           if (t == null) return const SizedBox.expand();
@@ -220,17 +214,14 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     final lv = _land.value;
     final landing = _land.value != 0;
     // Recorrido limpio, sin inclinaciones 3D (así no entra "chanfleado"):
-    //  0–.18 se abre la tapa · .18–.40 sale recto del estuche (vertical) ·
+    //  0–.40 sale recto de la portada (vertical) ·
     //  .40–.62 gira plano 90° y crece hasta el tamaño del deck · .62–1 baja recto a la ranura.
     final caseH = src.height, caseW = caseH * 0.63;
     final sCase = math.min(caseH * 0.88 / cw, caseW * 0.80 / ch).toDouble();
-    var lid = Curves.easeInOut.transform((p / 0.18).clamp(0.0, 1.0).toDouble());
-    if (widget.reverse && !_pre.isCompleted) lid = Curves.easeInOut.transform(_pre.value);
-    final out = Curves.easeOutCubic.transform(((p - 0.18) / 0.22).clamp(0.0, 1.0).toDouble());
+    final out = Curves.easeOutCubic.transform((p / 0.40).clamp(0.0, 1.0).toDouble());
     final turn = Curves.easeInOutCubic.transform(((p - 0.40) / 0.22).clamp(0.0, 1.0).toDouble());
     final dn = Curves.easeInOutCubic.transform(((p - 0.62) / 0.38).clamp(0.0, 1.0).toDouble());
-    // Con la tapa abierta, el conjunto se centra: se desplaza medio ancho de estuche.
-    final c0 = src.center + Offset(caseW * 0.5 * lid, 0);
+    final c0 = src.center;
     final lifted = c0 + Offset(0, -caseH * 0.95);
     final hover = bay.center + Offset(0, -ch * 1.15);
     Offset pos;
@@ -248,25 +239,9 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     final m = Matrix4.identity()
       ..rotateZ(rz)
       ..scale(scale);
-    // Vista de perfil mientras el cassette sale/entra del estuche; se endereza al volar al deck.
-    final side = 0.85 * (1 - turn);
-    return LayoutBuilder(builder: (context, box) {
-      return Transform(
-        alignment: Alignment(
-          (src.center.dx / box.maxWidth) * 2 - 1,
-          (src.center.dy / box.maxHeight) * 2 - 1,
-        ),
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.0012)
-          ..rotateY(side),
-        child: Stack(
+    return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Bandeja del estuche (con clavijas), siempre visible bajo el cassette.
-        Positioned.fromRect(
-          rect: src,
-          child: const Center(child: AspectRatio(aspectRatio: 0.63, child: CaseTray())),
-        ),
         Positioned(
           left: pos.dx - cw / 2,
           top: pos.dy - ch / 2,
@@ -297,17 +272,7 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
             ),
           ),
         ),
-        // Tapa transparente del estuche: gira sobre su borde izquierdo (se abre al sacar, se cierra al guardar).
-        Positioned.fromRect(
-          rect: src.shift(Offset(caseW * 0.5 * lid, 0)),
-          child: Center(
-            child: AspectRatio(
-                aspectRatio: 0.63, child: CaseLid(vinyl: v, angle: math.pi * lid, showTracks: false)),
-          ),
-        ),
       ],
-    ),
-      );
-    });
+    );
   }
 }
