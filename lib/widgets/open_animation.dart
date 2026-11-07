@@ -229,11 +229,13 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
     final out = Curves.easeOutCubic.transform(((p - 0.18) / 0.22).clamp(0.0, 1.0).toDouble());
     final turn = Curves.easeInOutCubic.transform(((p - 0.40) / 0.22).clamp(0.0, 1.0).toDouble());
     final dn = Curves.easeInOutCubic.transform(((p - 0.62) / 0.38).clamp(0.0, 1.0).toDouble());
-    final lifted = src.center + Offset(0, -caseH * 0.95);
+    // Con la tapa abierta, el conjunto se centra: se desplaza medio ancho de estuche.
+    final c0 = src.center + Offset(caseW * 0.5 * lid, 0);
+    final lifted = c0 + Offset(0, -caseH * 0.95);
     final hover = bay.center + Offset(0, -ch * 1.15);
     Offset pos;
     if (p < 0.40) {
-      pos = Offset.lerp(src.center, lifted, out)!;
+      pos = Offset.lerp(c0, lifted, out)!;
     } else if (p < 0.62) {
       pos = Offset.lerp(lifted, hover, turn)!;
     } else {
@@ -297,9 +299,10 @@ class _OpenAnimationState extends State<OpenAnimation> with TickerProviderStateM
         ),
         // Tapa transparente del estuche: gira sobre su borde izquierdo (se abre al sacar, se cierra al guardar).
         Positioned.fromRect(
-          rect: src,
+          rect: src.shift(Offset(caseW * 0.5 * lid, 0)),
           child: Center(
-            child: AspectRatio(aspectRatio: 0.63, child: CaseLid(vinyl: v, angle: math.pi * lid)),
+            child: AspectRatio(
+                aspectRatio: 0.63, child: CaseLid(vinyl: v, angle: math.pi * lid, showTracks: false)),
           ),
         ),
       ],

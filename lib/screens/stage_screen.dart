@@ -828,7 +828,14 @@ class _FlipCover extends StatelessWidget {
               ? Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.rotationY(math.pi),
-                  child: _Back(vinyl: vinyl, onTrack: onTrack),
+                  child: (vinyl.cassette || vinyl.single)
+                      ? Center(
+                          child: AspectRatio(
+                            aspectRatio: 0.63, // contratapa rectangular, como el estuche
+                            child: _Back(vinyl: vinyl, onTrack: onTrack),
+                          ),
+                        )
+                      : _Back(vinyl: vinyl, onTrack: onTrack),
                 )
               : front,
         );

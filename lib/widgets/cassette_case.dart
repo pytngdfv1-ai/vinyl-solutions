@@ -26,19 +26,26 @@ class CassetteCase extends StatelessWidget {
       tween: Tween<double>(end: target),
       duration: lid > 0 ? Duration.zero : const Duration(milliseconds: 1000),
       curve: Curves.easeInOut,
-      builder: (context, a, _) => Center(
-        child: AspectRatio(
+      builder: (context, a, _) => LayoutBuilder(builder: (context, c) {
+        final cw = math.min(c.maxWidth, c.maxHeight * 0.63);
+        return Center(
+        child: Transform.translate(
+          // Con la tapa abierta, el conjunto (tapa + bandeja) queda centrado.
+          offset: Offset(cw * 0.5 * (a > 1 ? 1 : a), 0),
+          child: AspectRatio(
           aspectRatio: 0.63,
           child: Stack(
             clipBehavior: Clip.none,
             fit: StackFit.expand,
             children: [
               CaseTray(vinyl: vinyl, showPegs: a > 0.02),
-              CaseLid(vinyl: vinyl, angle: math.pi * a),
+              CaseLid(vinyl: vinyl, angle: math.pi * a, showTracks: false),
             ],
           ),
         ),
-      ),
+        ),
+        );
+      }),
     );
   }
 }
@@ -138,9 +145,12 @@ class _TrayPainter extends CustomPainter {
 /// Tapa de plástico transparente. Cerrada muestra la portada; al abrirse más de 90° se ve su
 /// cara interna con la lista de temas (adaptada al rectángulo de la tapa).
 class CaseLid extends StatelessWidget {
-  const CaseLid({super.key, required this.vinyl, this.angle = 0});
+  const CaseLid({super.key, required this.vinyl, this.angle = 0, this.showTracks = true});
   final Vinyl vinyl;
   final double angle;
+
+  /// Muestra la lista de temas en la cara interna (en la animación se deja lisa).
+  final bool showTracks;
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +159,7 @@ class CaseLid extends StatelessWidget {
         ? Transform(
             alignment: Alignment.center,
             transform: Matrix4.rotationY(math.pi), // la cara interna se ve al revés: se corrige
-            child: _LidTracks(vinyl: vinyl),
+            child: showTracks ? _LidTracks(vinyl: vinyl) : const _LidBlank(),
           )
         : Stack(
             fit: StackFit.expand,
@@ -181,6 +191,22 @@ class CaseLid extends StatelessWidget {
         ..setEntry(3, 2, 0.0035)
         ..rotateY(-angle),
       child: face,
+    );
+  }
+}
+
+/// Cara interna lisa: plástico transparente oscuro.
+class _LidBlank extends StatelessWidget {
+  const _LidBlank();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white54, width: 1.3),
+        color: const Color(0x66222428),
+      ),
     );
   }
 }
